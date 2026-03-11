@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 345 20% 15%;
+    --foreground: 0 0% 98%;
+    --card: 345 20% 18%;
+    --card-foreground: 0 0% 98%;
+    --popover: 345 20% 15%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 345 90% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 345 20% 25%;
+    --secondary-foreground: 345 90% 65%;
+    --muted: 345 10% 25%;
+    --muted-foreground: 345 10% 70%;
+    --accent: 315 70% 75%;
+    --accent-foreground: 345 20% 15%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 345 20% 25%;
+    --input: 345 20% 25%;
+    --ring: 345 90% 65%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body;
+  }
+}
+
+@keyframes slow-zoom {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.animate-slow-zoom {
+  animation: slow-zoom 20s ease-in-out infinite;
+}
+
+.high-score-text {
+  background: linear-gradient(
+    to right,
+    #bf953f,
+    #fcf6ba,
+    #b38728,
+    #fcf6ba,
+    #bf953f
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gold-shine 3s linear infinite;
+}
+
+@keyframes gold-shine {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.gold-glow {
+  box-shadow: 0 0 50px hsla(45, 100%, 50%, 0.3);
+}
+
+.btn-game {
+  @apply relative overflow-hidden transition-all duration-300 transform hover:scale-105 active:scale-95;
+}
+
+.btn-game::after {
+  content: '';
+  @apply absolute inset-0 bg-white/10 opacity-0 transition-opacity;
+}
+
+.btn-game:hover::after {
+  @apply opacity-100;
+}
+
+canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-primary/20 rounded-full;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary/40;
+}

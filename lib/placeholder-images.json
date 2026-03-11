@@ -1,0 +1,76 @@
+{
+  "placeholderImages": [
+    {
+      "id": "ninja-kai",
+      "description": "Kai the Fire Ninja",
+      "imageUrl": "",
+      "imageHint": "fire ninja"
+    },
+    {
+      "id": "ninja-zane",
+      "description": "Zane the Ice Ninja",
+      "imageUrl": "",
+      "imageHint": "ice ninja"
+    },
+    {
+      "id": "ninja-cole",
+      "description": "Cole the Earth Ninja",
+      "imageUrl": "",
+      "imageHint": "earth ninja"
+    },
+    {
+      "id": "ninja-jay",
+      "description": "Jay the Lightning Ninja",
+      "imageUrl": "",
+      "imageHint": "lightning ninja"
+    },
+    {
+      "id": "ninja-lloyd",
+      "description": "Lloyd the Energy Ninja",
+      "imageUrl": "",
+      "imageHint": "energy ninja"
+    },
+    {
+      "id": "ninja-nya",
+      "description": "Nya the Water Ninja",
+      "imageUrl": "",
+      "imageHint": "water ninja"
+    },
+    {
+      "id": "enemy-hypnobrai",
+      "description": "Hypnobrai snake warrior",
+      "imageUrl": "",
+      "imageHint": "snake warrior"
+    },
+    {
+      "id": "enemy-fangpyre",
+      "description": "Fangpyre snake warrior",
+      "imageUrl": "",
+      "imageHint": "serpent monster"
+    },
+    {
+      "id": "enemy-constrictai",
+      "description": "Constrictai snake warrior",
+      "imageUrl": "",
+      "imageHint": "burrowing monster"
+    },
+    {
+      "id": "enemy-venomari",
+      "description": "Venomari snake warrior",
+      "imageUrl": "",
+      "imageHint": "venomous creature"
+    },
+    {
+      "id": "enemy-anacondrai",
+      "description": "Anacondrai warrior",
+      "imageUrl": "",
+      "imageHint": "invisible warrior"
+    },
+    {
+      "id": "enemy-oni",
+      "description": "Oni Demon",
+      "imageUrl": "",
+      "imageHint": "demon mask"
+    }
+  ]
+}
