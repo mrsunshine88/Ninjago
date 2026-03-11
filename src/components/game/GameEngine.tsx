@@ -2,8 +2,13 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { Ninja, Level } from '@/lib/game-data';
+import { getLeaderboard } from '@/lib/leaderboard';
 
-const SPRITE_SHEET_URL = "/sprite.png"; 
+interface Particle {
+    x: number; y: number; dx: number; dy: number; 
+    life: number; size: number; color: string; 
+    type: 'smoke' | 'spark' | 'ember' | 'snow' | 'rain' | 'dust' | 'vortex' | 'fire' | 'lightning' | 'void';
+}
 
 interface GameEngineProps {
   ninja: Ninja;
@@ -13,421 +18,413 @@ interface GameEngineProps {
   onLevelComplete: (points: number) => void;
 }
 
-function AnimatedScore({ value, onTick }: { value: number, onTick?: () => void }) {
-  const [displayValue, setDisplayValue] = useState(0);
-  const lastTickValue = useRef(0);
-  
-  useEffect(() => {
-    let start = displayValue;
-    const end = value;
-    if (start === end) { setDisplayValue(value); return; }
-    const duration = 1000;
-    const startTime = performance.now();
-    
-    const animate = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const current = Math.floor(start + (end - start) * progress);
-      if (Math.floor(current / 100) > Math.floor(lastTickValue.current / 100)) {
-        onTick?.();
-        lastTickValue.current = current;
-      }
-      setDisplayValue(current);
-      if (progress < 1) requestAnimationFrame(animate);
-    };
-    requestAnimationFrame(animate);
-  }, [value]);
-  
-  return <span>{displayValue.toLocaleString()}</span>;
-}
-
 export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComplete }: GameEngineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [spinEnergy, setSpinEnergy] = useState(0);
   const [gameStarted, setGameStarted] = useState(false);
-  const [isGameOver, setIsGameOver] = useState(false);
-  const [showLevelWin, setShowLevelWin] = useState(false);
-  const [lastScore, setLastScore] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
   const [currentScore, setCurrentScore] = useState(0);
-  const [levelStats, setLevelStats] = useState({ rank: 'B', bonus: 0, time: 0, timeBonus: 0, monsterPoints: 0, baseBossPoints: 0 });
-  const levelIntroTimer = useRef(120);
+  const [spinEnergy, setSpinEnergy] = useState(0);
+  const [displayTime, setDisplayTime] = useState(0);
+  const [highScore, setHighScore] = useState(0);
   
-  // PWA State
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [showInstallBtn, setShowInstallBtn] = useState(false);
-  const [isiOS, setIsiOS] = useState(false);
+  const state = useRef({
+    started: false,
+    active: true,
+    score: 0,
+    energy: 0,
+    cameraX: 0,
+    timeLeft: 0,
+    highScore: 0,
+    x: 100, y: 350, dx: 0, dy: 0,
+    fR: true, jump: false, jumpReq: false, spin: false, spinT: 0, 
+    enemies: [] as any[],
+    projs: [] as any[],
+    bossProjs: [] as any[],
+    plats: [] as any[],
+    hazards: [] as any[],
+    particles: [] as Particle[],
+    boss: { hp: 1, max: 1, active: false, x: 0, y: 0, w: 0, h: 0, img: '', attackCd: 0 },
+    initDone: false
+  });
 
-  const audioRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({});
-  const hasTriggeredEnd = useRef(false);
-  const gameState = useRef({ started: false, active: true });
+  const touch = useRef({ left: false, right: false, jump: false, fire: false, spin: false });
   const keys = useRef<{ [key: string]: boolean }>({});
-  const touchInput = useRef<{ [key: string]: boolean }>({ left: false, right: false, jump: false, fire: false, spin: false });
-  const spriteSheet = useRef<HTMLImageElement | null>(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const images = useRef<{ [key: string]: HTMLImageElement }>({});
+
+  const monsterFiles = [
+    'Blå orm.png', 'Grön demon.png', 'Grön orm.png', 'Guld svart orm.png', 
+    'Lila orm.png', 'Röd orm.png', 'Skelette.png', 'fiender ond.png', 
+    'lila svart monster.png', 'lila svart stor orm.png', 'stor drake.png', 'storm arg orm.png'
+  ];
 
   useEffect(() => {
-    setIsGameOver(false);
-    setShowLevelWin(false);
-    hasTriggeredEnd.current = false;
-    gameState.current.active = true;
-  }, [level]);
-
-  useEffect(() => {
-    setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0);
-    
-    // Detect iOS
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    setIsiOS(ios);
-
-    // PWA Install Prompt
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowInstallBtn(true);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    // Service Worker Registration
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(
-          (registration) => console.log('SW registered: ', registration),
-          (registrationError) => console.log('SW registration failed: ', registrationError)
-        );
-      });
+    setIsMobile(window.innerWidth < 1024);
+    const lb = getLeaderboard();
+    if (lb && lb.length > 0) {
+        const top = lb[0].score;
+        setHighScore(top);
+        state.current.highScore = top;
     }
 
-    const loadAudio = (src: string) => {
-        const audio = new Audio(src);
-        audio.preload = "auto";
-        return audio;
-    };
-
-    audioRefs.current = {
-      menuMusic: loadAudio('/audio/ninjago_menu_music_8bit.wav'),
-      battleMusic: loadAudio('/audio/ninjago_battle_music_8bit.wav'),
-      bossMusic: loadAudio('/audio/ninjago_boss_music_8bit.wav'),
-      spinSfx: loadAudio('/audio/sfx_spinjitzu_8bit.wav'),
-      lightningSfx: loadAudio('/audio/sfx_lightning_8bit.wav'),
-      hitSfx: loadAudio('/audio/sfx_sword_hit_8bit.wav'),
-      victorySfx: loadAudio('/audio/sfx_victory_fanfare.wav'),
-      tickSfx: loadAudio('/audio/sfx_tick.wav'),
-    };
+    const heroFiles = ['kai.png', 'Jay.png', 'zane.png', 'Cole.png', 'Lloyd.png', 'Nya.png', 'overlord.png'];
     
-    Object.values(audioRefs.current).forEach(a => { if (a) { a.volume = 0.5; if (a.src.includes('music')) a.loop = true; } });
-    
-    const img = new Image();
-    img.src = SPRITE_SHEET_URL;
-    img.onload = () => { spriteSheet.current = img; setImageLoaded(true); };
+    heroFiles.forEach(f => {
+      const img = new Image();
+      img.src = `/${f}`;
+      images.current[f.split('.')[0].toLowerCase()] = img;
+    });
 
-    const handleKey = (e: KeyboardEvent, val: boolean) => { keys.current[e.code] = val; };
+    monsterFiles.forEach(f => {
+      const img = new Image();
+      img.src = `/${encodeURIComponent(f)}`;
+      images.current[f.toLowerCase()] = img;
+    });
+
+    const handleKey = (e: KeyboardEvent, v: boolean) => {
+        keys.current[e.code] = v;
+        const k = e.key.toLowerCase();
+        if (k === 'x') keys.current['KeyX'] = v;
+        if (k === 'z') {
+            keys.current['KeyZ'] = v;
+            if (v && state.current.energy >= 100) { state.current.spin = true; state.current.spinT = 150; state.current.energy = 0; }
+        }
+        if (k === ' ' || e.code === 'Space') {
+            keys.current['Space'] = v;
+            if (v) state.current.jumpReq = true;
+        }
+    };
     window.addEventListener('keydown', (e) => handleKey(e, true));
     window.addEventListener('keyup', (e) => handleKey(e, false));
-    
+
     return () => { 
-      gameState.current.active = false;
-      Object.values(audioRefs.current).forEach(a => { if (a) { a.pause(); a.currentTime = 0; } });
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        state.current.active = false; 
+        if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     };
   }, []);
 
   useEffect(() => {
-    if (!imageLoaded || !spriteSheet.current) return;
     const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) return;
 
-    let rafId: number;
-    let frameCount = 0;
-    let cameraX = 0;
-    let scoreInternal = 0;
+    state.current.active = true;
 
-    const player = {
-      x: 100, y: 400, width: 85, height: 105, dx: 0, dy: 0,
-      jumping: false, facingRight: true, energy: 0,
-      isSpinjitzu: false, spinTimer: 0, rotation: 0, fireCooldown: 0
-    };
+    if (!state.current.initDone) {
+        const len = level.length;
+        const platforms: any[] = [];
+        platforms.push({ x: 0, y: 560, w: len, h: 200 }); 
+        
+        let curX = 1200;
+        while (curX < len - 3000) {
+            const h = 300 + Math.random() * 200;
+            const w = 400 + Math.random() * 800;
+            platforms.push({ x: curX, y: h, w, h: 40 }); 
+            if (Math.random() > 0.5) {
+                platforms.push({ x: curX - 100, y: 500, w: 100, h: 60 });
+            }
+            curX += w + 200 + Math.random() * 400;
+        }
+        
+        state.current.plats = platforms;
+        state.current.enemies = platforms.filter((p,i) => i > 0 && p.w > 200 && Math.random()>0.4).map((p,i) => {
+            const enemyX = p.x + 100;
+            const mFile = monsterFiles[i % monsterFiles.length];
+            return {
+                x: enemyX, y: p.y - 140, w: 120, h: 140, dx: -1.8, dy: 0, 
+                img: mFile.toLowerCase(), origX: enemyX, range: p.w - 150, onG: true 
+            };
+        });
 
-    const platforms = [
-      { x: 0, y: 550, width: 2500, height: 100 },
-      ...Array.from({ length: 15 }, (_, i) => ({
-        x: 2500 + i * 600, y: 350 + Math.random() * 150, width: 300, height: 50
-      })),
-      { x: 0, y: 550, width: 10000, height: 100 }
-    ];
+        let bossImg = 'overlord';
+        if (level.number === 1) bossImg = 'stor drake.png';
+        else if (level.number === 2) bossImg = 'lila svart stor orm.png';
+        else if (level.number === 3) bossImg = 'storm arg orm.png';
+        else if (level.number === 4) bossImg = 'grön demon.png';
+        else if (level.number === 5) bossImg = 'lila svart monster.png';
 
-    const enemies = Array.from({ length: 25 }, (_, i) => ({
-      x: 1500 + i * 500, y: 450, width: 90, height: 110, dx: 2, originalX: 1500 + i * 500,
-      dy: 0, jumping: false, isAlert: false, spriteRow: 2, spriteCol: Math.floor(Math.random() * 5)
-    }));
-
-    const boss = { 
-      x: 9500, y: 300, width: 220, height: 260, hp: level.boss.healthMultiplier * 15, maxHp: level.boss.healthMultiplier * 15,
-      active: false, spriteRow: level.boss.spriteRow, spriteCol: level.boss.spriteCol, timer: 0
-    };
-
-    let particles: any[] = [];
-    let projectiles: any[] = [];
-
-    function drawSprite(row: number, col: number, x: number, y: number, w: number, h: number, flip = false, wobble = 0) {
-      if (!spriteSheet.current) return;
-      ctx!.save();
-      ctx!.translate(x + w/2, y + h/2);
-      ctx!.rotate(wobble);
-      ctx!.scale(flip ? -1 : 1, 1);
-      // PERFEKT KALIBRERING: 1024px / 6 kolumner = 170.6px per sprite
-      const cols = 6;
-      const sw = 1024 / cols; 
-      const sh = 682 / 4;
-      
-      // Offset och padding för att centrera figuren perfekt
-      const paddingX = sw * 0.1;
-      const paddingY = sh * 0.05;
-      const sx = col * sw + paddingX;
-      const sy = row * sh + paddingY;
-      const swInner = sw - (paddingX * 2);
-      const shInner = sh - (paddingY * 1.5);
-      ctx!.drawImage(spriteSheet.current, sx, sy, swInner, shInner, -w/2, -h/2, w, h);
-      ctx!.restore();
+        state.current.boss = { 
+            x: len - 1200, y: 150, w: 420, h: 480, 
+            hp: level.boss.healthMultiplier * 20, 
+            max: level.boss.healthMultiplier * 20, 
+            active: false,
+            img: bossImg.toLowerCase(),
+            attackCd: 120
+        };
+        state.current.timeLeft = level.timeLimit;
+        state.current.initDone = true;
     }
+  }, [level, ninja]);
+
+  useEffect(() => {
+    if (!gameStarted || !state.current.active) return;
+    if (!audioRef.current) {
+        const audio = new Audio('/audio/ninjago_menu_music_8bit.wav');
+        audio.loop = true; audio.volume = 0.5; audio.play().catch(() => {});
+        audioRef.current = audio;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) return;
+
+    let raf: number;
+    let frames = 0;
+    let lastTime = Date.now();
 
     const loop = () => {
-      if (!gameState.current.active) return;
-      if (!gameState.current.started) { rafId = requestAnimationFrame(loop); return; }
+        if (!state.current.active) return;
+        frames++;
+        const s = state.current;
+        const now = Date.now();
+        if (now - lastTime >= 1000) { s.timeLeft = Math.max(0, s.timeLeft - 1); lastTime = now; if (s.timeLeft <= 0) { s.active = false; onGameOver(s.score); } }
 
-      frameCount++;
-      if (frameCount % 60 === 0) setCurrentTime(p => p + 1);
+        ctx.fillStyle = level.bgColor || '#1a140f';
+        ctx.fillRect(0, 0, 800, 600);
 
-      const moveL = keys.current['ArrowLeft'] || touchInput.current.left;
-      const moveR = keys.current['ArrowRight'] || touchInput.current.right;
-      if (moveL) { player.dx -= 1.1; player.facingRight = false; }
-      if (moveR) { player.dx += 1.1; player.facingRight = true; }
-      player.dx *= 0.85; player.dy += 0.5; player.x += player.dx; player.y += player.dy;
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        for(let i=0; i<20; i++) { const px = (i*2000-s.cameraX*0.05)%(level.length+2000); ctx.fillRect(px, 100, 600, 500); }
+        ctx.fillStyle = "rgba(0,0,0,0.15)";
+        for(let i=0; i<40; i++) { const px = (i*1200-s.cameraX*0.15)%(level.length+1200); ctx.fillRect(px, 200, 300, 400); }
 
-      platforms.forEach(p => {
-        if (player.x < p.x + p.width && player.x + player.width > p.x && player.y + player.height > p.y && player.y + player.height < p.y + p.height + player.dy + 1) {
-          player.y = p.y - player.height; player.dy = 0; player.jumping = false;
-        }
-      });
-      if ((keys.current['Space'] || touchInput.current.jump) && !player.jumping) { player.dy = -13.5; player.jumping = true; }
-      cameraX = Math.max(0, Math.min(player.x - 350, 9500));
+        const mL = keys.current['ArrowLeft'] || touch.current.left;
+        const mR = keys.current['ArrowRight'] || touch.current.right;
+        if (mL) { s.dx = Math.max(s.dx - 1.2, -11); s.fR = false; }
+        if (mR) { s.dx = Math.min(s.dx + 1.2, 11); s.fR = true; }
+        s.dx *= 0.88; s.dy += 0.8; s.x += s.dx; s.y += s.dy;
 
-      if ((keys.current['KeyX'] || touchInput.current.fire) && player.fireCooldown <= 0 && !player.isSpinjitzu) {
-        if (audioRefs.current.lightningSfx) { audioRefs.current.lightningSfx.currentTime = 0; audioRefs.current.lightningSfx.play().catch(()=>{}); }
-        projectiles.push({ x: player.facingRight ? player.x + 80 : player.x, y: player.y + 50, dx: player.facingRight ? 16 : -16, color: ninja.color, size: 15 });
-        player.fireCooldown = 25;
-      }
-      if (player.fireCooldown > 0) player.fireCooldown--;
-
-      if ((keys.current['KeyZ'] || keys.current['Keyz'] || touchInput.current.spin) && player.energy >= 100 && !player.isSpinjitzu) {
-        player.isSpinjitzu = true; player.spinTimer = 180; player.energy = 0; setSpinEnergy(0);
-        if (audioRefs.current.spinSfx) { audioRefs.current.spinSfx.currentTime = 0; audioRefs.current.spinSfx.play().catch(()=>{}); }
-      }
-      if (player.isSpinjitzu) { player.spinTimer--; player.rotation += 0.8; player.dx = player.facingRight ? 12 : -12; if (player.spinTimer <= 0) player.isSpinjitzu = false; }
-
-      enemies.forEach((e, i) => {
-        const distToPlayer = Math.abs(player.x - e.x);
-        if (distToPlayer < 600 && !e.isAlert) {
-          e.isAlert = true;
-          enemies.forEach(n => { if (Math.abs(n.x - e.x) < 800) n.isAlert = true; });
-        }
-        if (e.isAlert) {
-          e.dx = (player.x > e.x ? 4.5 : -4.5);
-          e.x += e.dx;
-          if (distToPlayer < 300 && !e.jumping && Math.random() < 0.02) { e.dy = -11; e.jumping = true; }
-        } else {
-          e.x += e.dx; if (Math.abs(e.x - e.originalX) > 300) e.dx *= -1;
-        }
-        e.dy += 0.5; e.y += e.dy;
-        platforms.forEach(p => { if (e.x < p.x + p.width && e.x + e.width > p.x && e.y + e.height > p.y && e.y + e.height < p.y + p.height + e.dy) { e.y = p.y - e.height; e.dy = 0; e.jumping = false; } });
-
-        if (player.x < e.x + e.width && player.x + player.width > e.x && player.y < e.y + e.height && player.y + player.height > e.y) {
-          if (player.isSpinjitzu) { 
-            enemies.splice(i, 1); scoreInternal += 100; setCurrentScore(scoreInternal);
-            for(let k=0; k<12; k++) particles.push({ x: e.x+40, y: e.y+50, dx: (Math.random()-0.5)*12, dy: (Math.random()-0.5)*12, life: 40, color: '#999', size: 10 });
-          } else {
-            gameState.current.active = false;
-            handleGameOver(scoreInternal);
-            return;
-          }
-        }
-      });
-
-      projectiles.forEach((p, i) => {
-        p.x += p.dx;
-        enemies.forEach((e, ei) => {
-          if (p.x > e.x && p.x < e.x + e.width && p.y > e.y - 20 && p.y < e.y + e.height) {
-            enemies.splice(ei, 1); scoreInternal += 100; setCurrentScore(scoreInternal);
-            player.energy = Math.min(100, player.energy + 15); setSpinEnergy(player.energy);
-            projectiles.splice(i, 1);
-            for(let k=0; k<10; k++) particles.push({ x: e.x+40, y: e.y+50, dx: (Math.random()-0.5)*10, dy: (Math.random()-0.5)*10, life: 35, color: '#f00', size: 8 });
-          }
+        let onGround = false;
+        const hitboxPadding = 30;
+        s.plats.forEach(plat => {
+            if (s.x + hitboxPadding < plat.x + plat.w && s.x + 140 - hitboxPadding > plat.x) {
+                if (s.y + 160 > plat.y && s.y + 160 < plat.y + 60 + Math.max(0, s.dy)) {
+                    s.y = plat.y - 160; s.dy = 0; s.jump = false; onGround = true;
+                }
+            }
         });
-        if (boss.active && p.x > boss.x && p.x < boss.x + boss.width && p.y > boss.y && p.y < boss.y + boss.height) { boss.hp--; projectiles.splice(i, 1); if (boss.hp <= 0) { gameState.current.active = false; handleLevelWin(scoreInternal + 10000, frameCount, 10000); } }
-        if (Math.abs(p.x - player.x) > 1200) projectiles.splice(i, 1);
-      });
 
-      ctx.fillStyle = level.bgColor; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.save(); ctx.translate(-cameraX, 0);
-      ctx.fillStyle = level.platformColor;
-      platforms.forEach(p => ctx.fillRect(p.x, p.y, p.width, p.height));
-      enemies.forEach(e => {
-        drawSprite(e.spriteRow, e.spriteCol, e.x, e.y, e.width, e.height, e.dx > 0, Math.sin(frameCount * 0.15) * 0.1);
-        if (e.isAlert) {
-            ctx.fillStyle = '#f00'; ctx.font = 'bold 40px Arial'; ctx.textAlign='center'; ctx.fillText('!', e.x + 45, e.y - 30);
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeText('!', e.x + 45, e.y - 30);
+        if (touch.current.jump) s.jumpReq = true;
+        if (s.jumpReq && !s.jump && onGround) { s.dy = -23; s.jump = true; s.jumpReq = false; }
+        if (s.jump || !onGround) { if (frames % 60 === 0) s.jumpReq = false; }
+        if (s.y > 650) { s.y = 400; s.dy = 0; }
+
+        s.cameraX = Math.max(0, Math.min(s.x - 300, level.length - 800));
+        s.energy = Math.min(100, s.energy + 0.2); 
+        
+        if ((keys.current['KeyX'] || touch.current.fire) && !s.spin) { s.projs.push({ x: s.fR?s.x+110:s.x+30, y: s.y+80, dx: s.fR?22:-22, c: ninja.color }); keys.current['KeyX'] = false; touch.current.fire = false; }
+        if (touch.current.spin && s.energy >= 100) { s.spin = true; s.spinT = 150; s.energy = 0; touch.current.spin = false; }
+        if (s.spin) { s.spinT--; s.dx = s.fR ? 17 : -17; if(frames%2===0) s.particles.push({ x: s.x+70+Math.cos(frames*0.5)*100, y: s.y+80+Math.sin(frames*0.5)*100, dx: 0, dy: 0, life: 30, size: 5, color: ninja.color, type: 'vortex' }); if(s.spinT <= 0) s.spin = false; }
+
+        if (frames % 4 === 0) {
+            const at = level.atmosphereType;
+            if (at === 'snow') s.particles.push({ x: s.cameraX+Math.random()*800, y: -20, dx: (Math.random()-0.5)*2, dy: 2+Math.random()*3, life: 200, size: 2+Math.random()*3, color: 'white', type: 'snow' });
+            if (at === 'embers') s.particles.push({ x: s.cameraX+Math.random()*800, y: 620, dx: (Math.random()-0.5)*2, dy: -2-Math.random()*2, life: 100, size: 2+Math.random()*3, color: '#ff6600', type: 'ember' });
+            if (at === 'rain') s.particles.push({ x: s.cameraX+Math.random()*800, y: -20, dx: 4, dy: 15, life: 60, size: 1, color: '#aaaaff88', type: 'rain' });
         }
-      });
-      if (player.isSpinjitzu) {
-        ctx.save(); ctx.translate(player.x + 42, player.y + 52); ctx.rotate(player.rotation); ctx.fillStyle = ninja.color;
-        for(let n=0; n<8; n++){ ctx.rotate(Math.PI/4); ctx.beginPath(); ctx.ellipse(0,0, 40, 130, 0, 0, Math.PI*2); ctx.fill(); }
-        ctx.restore();
-      } else {
-        drawSprite(0, ninja.spriteCol, player.x, player.y, player.width, player.height, !player.facingRight, Math.sin(frameCount * 0.2) * 0.05);
-      }
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 18px Arial'; ctx.textAlign = 'center'; ctx.fillText(playerName, player.x + 42, player.y - 15);
-      if (cameraX > 8500) {
-        boss.active = true; boss.timer++; boss.x += Math.sin(boss.timer * 0.04) * 6;
-        drawSprite(boss.spriteRow, boss.spriteCol, boss.x, boss.y, boss.width, boss.height, player.x > boss.x);
-        ctx.fillStyle = '#111'; ctx.fillRect(cameraX + 150, 40, 500, 25);
-        ctx.fillStyle = '#f00'; ctx.fillRect(cameraX + 150, 40, (boss.hp/boss.maxHp)*500, 25);
-      }
-      particles.forEach((p, i) => {
-        p.x += p.dx; p.y += p.dy; p.life--; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size);
-        if (p.life <= 0) particles.splice(i, 1);
-      });
-      ctx.restore();
 
-      if (scoreInternal !== currentScore) setCurrentScore(scoreInternal);
-      if (levelIntroTimer.current > 0) {
-        levelIntroTimer.current -= 2;
-        ctx.fillStyle = `rgba(0,0,0,${Math.max(0, levelIntroTimer.current/120)})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-      if (player.y > 800) { gameState.current.active = false; handleGameOver(scoreInternal); }
-      rafId = requestAnimationFrame(loop);
+        ctx.save(); ctx.translate(-s.cameraX, 0);
+        s.particles.forEach((p, i) => {
+            p.x += p.dx; p.y += p.dy; p.life--;
+            if (p.life <= 0) { s.particles.splice(i, 1); return; }
+            ctx.fillStyle = p.color;
+            if (p.type === 'vortex') { ctx.shadowBlur = 10; ctx.shadowColor = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0; }
+            else { ctx.fillRect(p.x, p.y, p.size, p.size); }
+        });
+
+        s.plats.forEach(plat => {
+            const grad = ctx.createLinearGradient(plat.x, plat.y, plat.x, plat.y + plat.h);
+            grad.addColorStop(0, level.platformColor || '#3d2b1f'); grad.addColorStop(1, '#000000');
+            ctx.fillStyle = grad; ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+            ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(plat.x, plat.y, plat.w, 4);
+        });
+
+        s.enemies.forEach((e, i) => {
+            e.dy += 0.8; e.y += e.dy;
+            s.plats.forEach(plat => {
+                if (e.x + 10 < plat.x + plat.w && e.x + e.w - 10 > plat.x) {
+                    if (e.y + e.h > plat.y && e.y + e.h < plat.y + 40 + e.dy) { e.y = plat.y - e.h; e.dy = 0; }
+                }
+            });
+            const dist = (s.x + 70) - (e.x + 50);
+            if (Math.abs(dist) < 600 && Math.abs(s.y - e.y) < 300) { e.dx = dist > 0 ? 3.4 : -3.4; e.x += e.dx; }
+            else { e.x += e.dx; if (e.x < e.origX || e.x > e.origX + e.range) e.dx *= -1; }
+            
+            const mImg = images.current[e.img];
+            if (mImg?.complete && mImg.naturalWidth > 0) {
+                ctx.save();
+                if (e.dx > 0) { ctx.translate(e.x + e.w, e.y); ctx.scale(-1, 1); ctx.drawImage(mImg, 0, 0, e.w, e.h); }
+                else ctx.drawImage(mImg, e.x, e.y, e.w, e.h);
+                ctx.restore();
+                // BORTTAGEN LILA RUTA!
+            } else { 
+                ctx.fillStyle = "#8b5cf6"; ctx.fillRect(e.x, e.y, e.w, e.h);
+            }
+
+            if (s.x < e.x + e.w - 15 && s.x + 140 > e.x + 15 && s.y < e.y + e.h - 15 && s.y + 160 > e.y + 15) {
+                if (s.spin) { 
+                    s.enemies.splice(i, 1); s.score += 100; s.energy = Math.min(100, s.energy + 20); 
+                    for(let k=0; k<12; k++) s.particles.push({ x: e.x+50, y: e.y+60, dx: (Math.random()-0.5)*12, dy: (Math.random()-0.5)*12, life: 40, size: 5, color: '#ffcc00', type: 'spark' }); 
+                } else { s.active = false; onGameOver(s.score); }
+            }
+        });
+
+        s.projs.forEach((pr, i) => {
+            pr.x += pr.dx;
+            const pGrad = ctx.createRadialGradient(pr.x, pr.y, 0, pr.x, pr.y, 40);
+            pGrad.addColorStop(0, 'white'); pGrad.addColorStop(0.3, pr.c); pGrad.addColorStop(1, 'transparent');
+            ctx.fillStyle = pGrad; ctx.beginPath(); ctx.arc(pr.x, pr.y, 40, 0, Math.PI*2); ctx.fill();
+            s.enemies.forEach((e, ei) => {
+                if (pr.x > e.x && pr.x < e.x + e.w && pr.y > e.y && pr.y < e.y + e.h) { s.enemies.splice(ei, 1); s.projs.splice(i, 1); s.score += 100; s.energy = Math.min(100, s.energy + 10); for(let k=0; k<15; k++) s.particles.push({ x: e.x+60, y: e.y+70, dx: (Math.random()-0.5)*15, dy: (Math.random()-0.5)*15, life: 30, size: 3, color: pr.c, type: 'spark' }); }
+            });
+            if (pr.x > s.boss.x && pr.x < s.boss.x + s.boss.w && pr.y > s.boss.y && pr.y < s.boss.y + s.boss.h) { s.boss.hp--; s.projs.splice(i, 1); if (s.boss.hp <= 0) { s.active = false; onLevelComplete(s.score + level.bossPoints + (s.timeLeft * 50)); } }
+        });
+
+        // BOSS ATTACK LOGIC & PROJECTILES
+        if (s.x > level.length - 3000) {
+            s.boss.attackCd--;
+            if (s.boss.attackCd <= 0) {
+                const bX = s.boss.x + s.boss.w/2;
+                const bY = s.boss.y + s.boss.h/2;
+                const targetX = s.x + 70;
+                const targetY = s.y + 80;
+                const angle = Math.atan2(targetY - bY, targetX - bX);
+                
+                // Diff skalar med nivå (1 = lättast, 6 = svårast)
+                const speed = 6 + level.number * 1.5;
+                const color = level.number === 1 ? '#ff4400' : level.number === 6 ? '#8b5cf6' : '#00ffcc';
+                
+                s.bossProjs.push({ x: bX, y: bY, dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed, c: color, r: 25 + level.number * 5 });
+                s.boss.attackCd = Math.max(30, 180 - level.number * 25); // Tätare attacker vid högre nivå
+                
+                // Partiklar vid avfyring
+                for(let k=0; k<10; k++) s.particles.push({ x: bX, y: bY, dx: (Math.random()-0.5)*10, dy: (Math.random()-0.5)*10, life: 20, size: 4, color: color, type: 'spark' });
+            }
+        }
+
+        s.bossProjs.forEach((bp, i) => {
+            bp.x += bp.dx; bp.y += bp.dy;
+            const bpGrad = ctx.createRadialGradient(bp.x, bp.y, 0, bp.x, bp.y, bp.r);
+            bpGrad.addColorStop(0, 'white'); bpGrad.addColorStop(0.4, bp.c); bpGrad.addColorStop(1, 'transparent');
+            ctx.fillStyle = bpGrad; ctx.beginPath(); ctx.arc(bp.x, bp.y, bp.r, 0, Math.PI*2); ctx.fill();
+            
+            // Ninja Hit Test
+            const dist = Math.hypot(bp.x - (s.x + 70), bp.y - (s.y + 80));
+            if (dist < bp.r + 40 && !s.spin) { s.active = false; onGameOver(s.score); }
+            
+            if (bp.x < s.cameraX - 100 || bp.x > s.cameraX + 900 || bp.y < -100 || bp.y > 700) s.bossProjs.splice(i, 1);
+        });
+
+        const nImg = images.current[ninja.id.toLowerCase()];
+        ctx.save(); ctx.translate(s.x + 70, s.y + 80); if (!s.fR) ctx.scale(-1, 1);
+        if (nImg?.complete && nImg.naturalWidth > 0) ctx.drawImage(nImg, -70, -80, 140, 160);
+        else { ctx.fillStyle = ninja.color; ctx.fillRect(-70, -80, 140, 160); }
+        ctx.restore();
+
+        if (s.spin) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const sGrad = ctx.createRadialGradient(s.x+70, s.y+80, 0, s.x+70, s.y+80, 140); sGrad.addColorStop(0, 'white'); sGrad.addColorStop(0.5, ninja.color); sGrad.addColorStop(1, 'transparent'); ctx.fillStyle = sGrad; ctx.beginPath(); ctx.arc(s.x+70, s.y+80, 140, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+        
+        if (s.x > level.length - 2500) {
+            const bImg = images.current[s.boss.img];
+            if (bImg?.complete && bImg.naturalWidth > 0) ctx.drawImage(bImg, s.boss.x, s.boss.y, s.boss.w, s.boss.h);
+            ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(s.cameraX+200, 30, 400, 25);
+            ctx.fillStyle = "#ff4444"; ctx.fillRect(s.cameraX+200, 30, 400*(s.boss.hp/s.boss.max), 25);
+            ctx.strokeStyle = "white"; ctx.strokeRect(s.cameraX+200, 30, 400, 25);
+            ctx.fillStyle = "white"; ctx.font = "bold 16px Arial"; ctx.textAlign = "center";
+            ctx.fillText(s.boss.img.toUpperCase().replace('.PNG', ''), s.cameraX+400, 25);
+        }
+        ctx.restore();
+
+        if (frames % 10 === 0) { setCurrentScore(s.score); setSpinEnergy(s.energy); setDisplayTime(s.timeLeft); }
+        raf = requestAnimationFrame(loop);
     };
 
-    rafId = requestAnimationFrame(loop);
-    return () => { cancelAnimationFrame(rafId); };
-  }, [imageLoaded, level, ninja]);
-
-  const handleGameOver = (score: number) => { 
-    if (hasTriggeredEnd.current) return; 
-    hasTriggeredEnd.current = true;
-    setLastScore(score); setIsGameOver(true); onGameOver(score); 
-  };
-  
-  const handleLevelWin = (score: number, frames: number, bp: number) => { 
-    if (hasTriggeredEnd.current) return; 
-    hasTriggeredEnd.current = true; 
-    setLastScore(score); setShowLevelWin(true); 
-    if (audioRefs.current.victorySfx) audioRefs.current.victorySfx.play().catch(()=>{});
-  };
-
-  const handleStartGame = () => {
-    setGameStarted(true);
-    gameState.current.started = true;
-    if (audioRefs.current.menuMusic) audioRefs.current.menuMusic.pause();
-    const bMusic = audioRefs.current.battleMusic;
-    if (bMusic) {
-        bMusic.currentTime = 0;
-        bMusic.play().catch(e => console.log("Music blocked by browser"));
-    }
-  };
-
-  const handleInstallClick = () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then((choiceResult: any) => {
-        if (choiceResult.outcome === 'accepted') {
-          console.log('User accepted the A2HS prompt');
-        }
-        setDeferredPrompt(null);
-        setShowInstallBtn(false);
-      });
-    }
-  };
+    raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); };
+  }, [gameStarted]);
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden rounded-3xl border-4 border-white/20">
+    <div className="relative w-full aspect-video bg-black overflow-hidden rounded-3xl border-4 border-white/10 shadow-2xl">
       <canvas ref={canvasRef} width={800} height={600} className="w-full h-full object-contain" />
+      
       {!gameStarted && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md">
-          <div className="max-w-md w-full p-10 rounded-[2rem] bg-white/10 border border-white/20 shadow-2xl backdrop-blur-xl flex flex-col items-center gap-8 text-center">
-            <h2 className="text-5xl font-black text-white uppercase italic tracking-tighter">Mästare {playerName}</h2>
-            <div className="w-full space-y-4">
-              <button onClick={handleStartGame} className="w-full py-6 bg-gradient-to-r from-red-600 to-orange-500 text-white text-3xl font-black rounded-2xl border-b-8 border-red-800 active:border-0 active:translate-y-2 transition-all shadow-[0_0_30px_rgba(239,68,68,0.3)]">STARTA SPELET</button>
-              
-              {showInstallBtn && (
-                <button onClick={handleInstallClick} className="w-full py-4 bg-white/10 text-white font-bold rounded-xl border border-white/20 flex items-center justify-center gap-3 hover:bg-white/20 transition-all uppercase text-sm">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                  Hämta Appen
-                </button>
-              )}
-
-              {isiOS && (
-                <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-200 text-xs">
-                  <p className="flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Installation på iOS: 
-                  </p>
-                  <p className="mt-1 opacity-80">Klicka på "Dela" och sedan på "Lägg till på hemskärmen" för att installera.</p>
-                </div>
-              )}
+        <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-black/85 backdrop-blur-3xl px-12 text-center text-white">
+            <div className="w-32 h-32 bg-white/10 rounded-full mb-6 p-4 border border-white/20 animate-pulse overflow-hidden">
+                <img src="/icon.png" className="w-full h-full object-cover rounded-full" alt="Ninjago" />
             </div>
-          </div>
+            <h2 className="text-6xl font-black italic mb-2 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500">BANA {level.number}</h2>
+            <h3 className="text-4xl font-bold text-white uppercase mb-4 tracking-widest">{level.name}</h3>
+            <p className="max-w-md text-white/50 mb-10 text-xl font-medium leading-relaxed italic">"{level.description}"</p>
+            <button 
+                onPointerDown={() => { state.current.started = true; setGameStarted(true); }}
+                className="group relative px-20 py-10 bg-gradient-to-br from-red-600 to-red-800 text-white text-5xl font-black rounded-[2.5rem] shadow-[0_20px_60px_rgba(255,0,0,0.6)] border-b-[16px] border-red-950 active:border-0 active:translate-y-4 transition-all duration-75"
+            >
+                STARTA STRIDEN!
+            </button>
         </div>
       )}
+
       {gameStarted && (
-        <div className="absolute top-4 left-8 flex gap-6 pointer-events-none">
-           <div className="p-3 bg-black/60 rounded-2xl border border-white/10 min-w-[100px] flex flex-col items-center">
-              <span className="text-[10px] text-white/50 uppercase font-bold">Tid</span>
-              <span className="text-2xl font-black text-white">{Math.floor(currentTime / 60).toString().padStart(2, '0')}:{(currentTime % 60).toString().padStart(2, '0')}</span>
-           </div>
-           <div className="p-3 bg-black/60 rounded-2xl border border-white/10 min-w-[120px] flex flex-col items-center">
-              <span className="text-[10px] text-white/50 uppercase font-bold">Poäng</span>
-              <span className="text-2xl font-black text-red-500">{currentScore}</span>
-           </div>
-        </div>
+        <>
+            <div className="absolute top-4 inset-x-6 z-[200] flex justify-between items-start pointer-events-none">
+                <div className="flex flex-col gap-2">
+                    <div className="px-6 py-3 bg-black/60 backdrop-blur-md rounded-2xl border border-white/20 text-white font-black text-3xl shadow-2xl flex items-center gap-4">
+                        <div className="w-4 h-4 rounded-full bg-red-500 animate-ping" />
+                        {currentScore}
+                    </div>
+                    <div className="px-4 py-1 bg-yellow-500/20 backdrop-blur-sm rounded-xl border border-yellow-500/40 text-yellow-500 font-bold text-sm tracking-widest uppercase">
+                        REKORD: {highScore}
+                    </div>
+                </div>
+                
+                <div className="absolute left-1/2 -translate-x-1/2 top-4 flex flex-col items-center gap-1">
+                    <div className="text-[10px] font-black text-white/40 tracking-[0.3em] uppercase">Spinjitzu (Z)</div>
+                    <div className="w-48 h-5 bg-black/50 rounded-full border border-white/20 overflow-hidden backdrop-blur-md shadow-inner relative">
+                        <div 
+                            className={`h-full transition-all duration-300 ${spinEnergy >= 100 ? 'bg-yellow-400 shadow-[0_0_20px_yellow]' : 'bg-blue-500'}`} 
+                            style={{ width: `${spinEnergy}%` }} 
+                        />
+                        {spinEnergy >= 100 && <div className="absolute inset-0 animate-pulse bg-white/20" />}
+                    </div>
+                </div>
+
+                <div className="flex flex-col items-end gap-2 text-right">
+                    <div className={`px-6 py-3 bg-black/60 backdrop-blur-md rounded-2xl border ${displayTime < 30 ? 'border-red-500 text-red-500 animate-pulse' : 'border-white/20 text-white'} font-black text-3xl shadow-2xl`}>
+                        TID: {displayTime}s
+                    </div>
+                </div>
+            </div>
+        </>
       )}
-      {showLevelWin && (
-        <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-2xl">
-           <div className="p-12 rounded-[3.5rem] bg-white/10 border border-white/30 shadow-2xl flex flex-col items-center gap-8 text-center max-w-lg w-full text-white">
-              <h1 className="text-7xl font-black text-yellow-400 uppercase italic">Bana Klar!</h1>
-              <div className="text-5xl font-black"><AnimatedScore value={lastScore} onTick={() => (audioRefs.current.tickSfx?.cloneNode(true) as HTMLAudioElement).play()} /></div>
-              <button onClick={() => onLevelComplete(lastScore)} className="w-full py-5 bg-green-600 text-white font-black text-2xl rounded-2xl">NÄSTA BANA</button>
-           </div>
-        </div>
-      )}
-      {isGameOver && (
-        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-xl">
-           <div className="p-12 rounded-[3.5rem] bg-white/10 border border-red-500/50 shadow-2xl flex flex-col items-center gap-6 text-center text-white">
-              <h2 className="text-6xl font-black uppercase text-red-500 italic font-black">Banan Slut</h2>
-              <div className="text-7xl font-black text-white">{lastScore}</div>
-              <button onClick={() => window.location.reload()} className="px-12 py-5 bg-white/10 text-white rounded-2xl border-2 border-white/20 font-black uppercase transition-all">FÖRSÖK IGEN</button>
-           </div>
-        </div>
-      )}
-      <div className="absolute top-4 right-8">
-        <div className="w-48 h-8 bg-black/60 rounded-full border-2 border-white/20 p-1">
-          <div className={`h-full bg-yellow-400 rounded-full transition-all duration-300 ${spinEnergy >= 100 ? 'animate-pulse shadow-[0_0_15px_#fbbf24]' : ''}`} style={{ width: `${spinEnergy}%` }} />
-        </div>
-      </div>
-      {isMobile && gameStarted && (
-        <div className="absolute inset-0 pointer-events-none p-6 select-none">
-          <div className="absolute bottom-10 left-10 flex gap-6 pointer-events-auto">
-            <button onPointerDown={()=>touchInput.current.left=true} onPointerUp={()=>touchInput.current.left=false} className="w-24 h-24 bg-white/10 rounded-2xl text-white text-5xl flex items-center justify-center border-b-4 border-white/20 active:border-0 active:translate-y-1">←</button>
-            <button onPointerDown={()=>touchInput.current.right=true} onPointerUp={()=>touchInput.current.right=false} className="w-24 h-24 bg-white/10 rounded-2xl text-white text-5xl flex items-center justify-center border-b-4 border-white/20 active:border-0 active:translate-y-1">→</button>
-          </div>
-          <div className="absolute bottom-10 right-10 flex flex-row items-end gap-5 pointer-events-auto">
-            <button onPointerDown={()=>touchInput.current.spin=true} onPointerUp={()=>touchInput.current.spin=false} className={`w-28 h-28 rounded-full border-4 font-black transition-all flex items-center justify-center shadow-xl ${spinEnergy >= 100 ? 'bg-yellow-400 text-black border-yellow-200 scale-110 shadow-[0_0_30px_#fbbf24]' : 'bg-white/5 text-white/40 border-white/10'}`}>SPIN</button>
-            <button onPointerDown={()=>touchInput.current.fire=true} onPointerUp={()=>touchInput.current.fire=false} className="w-24 h-24 bg-red-600/40 rounded-full text-white font-black flex items-center justify-center border-4 border-red-500/20 active:scale-95 shadow-lg text-[10px]">ANFALL</button>
-            <button onPointerDown={()=>touchInput.current.jump=true} onPointerUp={()=>touchInput.current.jump=false} className="w-32 h-32 bg-blue-600/40 rounded-full text-white font-black text-2xl flex items-center justify-center border-4 border-blue-500/20 active:scale-95 shadow-xl">HOPP</button>
-          </div>
+
+      {gameStarted && isMobile && (
+        <div className="absolute inset-x-0 bottom-0 top-0 z-[200] pointer-events-none p-6">
+             <div className="absolute bottom-8 left-8 flex gap-6 pointer-events-auto">
+                <button 
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.left=true; }} 
+                    onPointerUp={(e)=>{ e.preventDefault(); touch.current.left=false; }} 
+                    onPointerLeave={(e)=>{ e.preventDefault(); touch.current.left=false; }}
+                    className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-6xl shadow-2xl border border-white/20 select-none active:bg-white/30 transition-all font-black text-white"
+                >←</button>
+                <button 
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.right=true; }} 
+                    onPointerUp={(e)=>{ e.preventDefault(); touch.current.right=false; }} 
+                    onPointerLeave={(e)=>{ e.preventDefault(); touch.current.right=false; }}
+                    className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-6xl shadow-2xl border border-white/20 select-none active:bg-white/30 transition-all font-black text-white"
+                >→</button>
+            </div>
+            <div className="absolute bottom-8 right-8 flex items-end gap-5 pointer-events-auto">
+                <button 
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }} 
+                    className={`w-18 h-18 rounded-full border-4 font-black mt-2 text-xs transition-all select-none ${spinEnergy >= 100 ? 'bg-yellow-400 text-black border-white shadow-[0_0_30px_rgba(255,255,255,0.8)] scale-110' : 'bg-white/5 text-white/10 border-white/5'}`}
+                >SPIN</button>
+                <button 
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} 
+                    onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} 
+                    onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
+                    className="w-28 h-28 bg-blue-600/40 backdrop-blur-xl rounded-full font-black text-3xl shadow-2xl border-4 border-white/30 active:scale-90 transition-all select-none text-white"
+                >HOPP</button>
+            </div>
         </div>
       )}
     </div>

@@ -20,6 +20,7 @@ export function getLeaderboard(): ScoreEntry[] {
 }
 
 export function saveScore(entry: ScoreEntry): { isHighScore: boolean } {
+  if (entry.score <= 200) return { isHighScore: false };
   const current = getLeaderboard();
   const updated = [...current, entry]
     .sort((a, b) => b.score - a.score)

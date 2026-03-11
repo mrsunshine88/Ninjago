@@ -23,34 +23,11 @@ export function StartScreen({ onStart, scores }: StartScreenProps) {
   const [selectedNinja, setSelectedNinja] = useState<Ninja | null>(null);
   const [hoveredNinja, setHoveredNinja] = useState<Ninja | null>(null);
   const [isAdminMode, setIsAdminMode] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
   
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const adminClicksRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const canStart = name.trim().length > 0 && selectedNinja !== null;
-
-  // Hantera musik vid interaktion
-  const startMusic = () => {
-    if (audioRef.current && audioRef.current.paused && !isMuted) {
-      audioRef.current.play().catch((err) => {
-        console.warn("Musik kunde inte starta automatiskt:", err);
-      });
-    }
-  };
-
-  const toggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (audioRef.current) {
-      const newMuteState = !isMuted;
-      audioRef.current.muted = newMuteState;
-      setIsMuted(newMuteState);
-      if (!newMuteState) {
-        audioRef.current.play().catch(() => {});
-      }
-    }
-  };
 
   const handleLogoClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -75,39 +52,48 @@ export function StartScreen({ onStart, scores }: StartScreenProps) {
     }
   };
 
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    });
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === "accepted") setInstallPrompt(null);
+  };
+
   return (
-    <div 
-      className="relative min-h-screen w-full flex flex-col items-center justify-center p-6 gap-8 overflow-hidden cursor-default"
-      onClick={startMusic}
-    >
-      {/* Bakgrundsbild med Zoom-effekt */}
+    <div className="relative min-h-screen w-full flex flex-col items-center justify-center p-6 gap-8 overflow-hidden cursor-default">
+      {/* PWA Install Button */}
+      {installPrompt && (
+        <button 
+          onClick={handleInstall}
+          className="absolute top-6 left-6 px-6 py-3 bg-yellow-400 text-black font-black rounded-full shadow-2xl animate-bounce z-50 flex items-center gap-2 border-2 border-black"
+        >
+          LADDA NER APPEN 📱
+        </button>
+      )}
+
+      {/* Bakgrund */}
       <div 
-        className={`absolute inset-0 bg-[url('/assets/ninjago-pictures.jpg')] bg-cover bg-center transition-all duration-1000 animate-slow-zoom -z-20 ${hoveredNinja ? 'opacity-40 blur-sm scale-110' : 'opacity-100'}`}
+        className={`absolute inset-0 bg-gradient-to-br from-black via-[#1a140f] to-black transition-all duration-1000 -z-20 ${hoveredNinja ? 'opacity-40 blur-sm scale-110' : 'opacity-100'}`}
       />
       
       {/* Mörkt Overlay */}
-      <div className="absolute inset-0 bg-black/40 -z-10" />
-
-      {/* Ljudkontroll */}
-      <button 
-        onClick={toggleMute}
-        className="absolute top-6 right-6 p-3 bg-black/40 hover:bg-black/60 rounded-full border border-white/20 transition-all z-50"
-      >
-        {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
-      </button>
-
-      <audio 
-        ref={audioRef}
-        src="/assets/ninjago_menu_music_8bit.wav"
-        loop
-      />
+      <div className="absolute inset-0 bg-black/60 -z-10" />
 
       <div 
         className="text-center space-y-4 cursor-pointer select-none active:scale-95 transition-transform"
         onClick={handleLogoClick}
       >
-        <div className="inline-block p-4 bg-primary/30 rounded-full mb-2 backdrop-blur-md border border-white/20 shadow-2xl">
-          <Swords className="w-16 h-16 text-primary animate-pulse" />
+        <div className="inline-block p-1 bg-white/10 rounded-full mb-2 backdrop-blur-md border border-white/20 shadow-2xl overflow-hidden">
+          <img src="/icon.png" alt="Ninjago" className="w-32 h-32 object-cover rounded-full" />
         </div>
         <h1 className="text-6xl md:text-8xl font-black tracking-tighter uppercase italic high-score-text drop-shadow-[0_5px_15px_rgba(0,0,0,0.8)]">
           Ninjago
@@ -190,9 +176,16 @@ export function StartScreen({ onStart, scores }: StartScreenProps) {
           </div>
         </div>
 
-        <div className="hidden lg:block space-y-4">
+      <div className="hidden lg:block space-y-4">
           <Leaderboard scores={scores} />
         </div>
+      </div>
+
+      {/* Credit Text */}
+      <div 
+        className="absolute bottom-5 right-5 text-[#FFD700] text-[14px] md:text-[16px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] z-50 pointer-events-none select-none"
+      >
+        Game Idea & Design by Lukas Persson
       </div>
     </div>
   );

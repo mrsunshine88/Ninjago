@@ -22,8 +22,15 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <link rel="apple-touch-icon" href="/sprite.png" />
+        <link rel="apple-touch-icon" href="/icon.png" />
         <meta name="theme-color" content="#EF4444" />
+        <script dangerouslySetInnerHTML={{ __html: `
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/sw.js');
+            });
+          }
+        `}} />
       </head>
       <body className="font-body antialiased bg-background text-foreground overflow-x-hidden">
         {children}

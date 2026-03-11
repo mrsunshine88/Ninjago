@@ -29,8 +29,11 @@ export interface Level {
   length: number;
   bgColor: string;
   platformColor: string;
+  atmosphereType?: 'dust' | 'snow' | 'embers' | 'rain' | 'void';
   hazardType?: 'lava' | 'ice' | 'none';
   difficulty: 1 | 2 | 3 | 4 | 5 | 6;
+  bossPoints: number;
+  timeLimit: number;
 }
 
 // Mappning enligt din sprite-sheet (Rad 1: Hjältar, Rad 2: Bossar)
@@ -40,7 +43,6 @@ export const NINJAS: Ninja[] = [
   { id: 'zane', name: 'Zane', power: 'Is', description: 'Mästare av Is. Fryser fiender!', color: '#F8FAFC', icon: 'Snowflake', spriteCol: 1 },
   { id: 'cole', name: 'Cole', power: 'Jord', description: 'Mästare av Jord. Skapar jordskalv!', color: '#171717', icon: 'Mountain', spriteCol: 2 },
   { id: 'lloyd', name: 'Lloyd', power: 'Energi', description: 'Den Gröna Ninjan. Massiv kraft!', color: '#22C55E', icon: 'Star', spriteCol: 4 },
-  { id: 'nya', name: 'Nya', power: 'Vatten', description: 'Mästare av Vatten. Trycker bort fiender!', color: '#38BDF8', icon: 'Waves', spriteCol: 5 },
 ];
 
 export const LEVELS: Level[] = [
@@ -48,10 +50,13 @@ export const LEVELS: Level[] = [
     number: 1, 
     name: 'Träning i Dojon',
     description: 'Inomhus i dojon. Lär dig Hoppa (Mellanslag) och Spin (Z).',
-    length: 4000,
-    bgColor: '#1a140f', // Trä-brun/mörk
+    length: 8000,
+    bgColor: '#1a140f',
     platformColor: '#3d2b1f',
+    atmosphereType: 'dust',
     difficulty: 1,
+    bossPoints: 2000,
+    timeLimit: 120,
     boss: { 
       name: 'Träningsrobot', 
       description: 'Enkel robot som står ganska still.', 
@@ -67,11 +72,14 @@ export const LEVELS: Level[] = [
     number: 2, 
     name: 'Hypnobrai-grottorna',
     description: 'Blå kristaller och is. Akta dig för hypnosen som fryser dig!',
-    length: 5500,
-    bgColor: '#051122', // Mörkblå grotta
+    length: 12000,
+    bgColor: '#051122',
     platformColor: '#1e3a8a',
+    atmosphereType: 'snow',
     hazardType: 'ice',
     difficulty: 2,
+    bossPoints: 4000,
+    timeLimit: 180,
     boss: { 
       name: 'Hypnobrai', 
       description: 'Blå Serpentine. Fryser dig vid träff!', 
@@ -87,11 +95,14 @@ export const LEVELS: Level[] = [
     number: 3, 
     name: 'Eldtemplet',
     description: 'Plattformar över lava. Fiender skjuter nu eldklot!',
-    length: 7000,
-    bgColor: '#330000', // Mörkröd/Lava
+    length: 15000,
+    bgColor: '#330000',
     platformColor: '#7f1d1d',
+    atmosphereType: 'embers',
     hazardType: 'lava',
     difficulty: 3,
+    bossPoints: 6000,
+    timeLimit: 240,
     boss: { 
       name: 'Fangpyre', 
       description: 'Röd Serpentine. Skjuter snabba projektiler!', 
@@ -107,10 +118,13 @@ export const LEVELS: Level[] = [
     number: 4, 
     name: 'Ninjago City (Natt)',
     description: 'Hustak och neon. Nindroids jagar dig mellan husen!',
-    length: 8500,
-    bgColor: '#020617', // Svart natt
+    length: 18000,
+    bgColor: '#020617',
     platformColor: '#1e1b4b',
+    atmosphereType: 'rain',
     difficulty: 4,
+    bossPoints: 8000,
+    timeLimit: 300,
     boss: { 
       name: 'Nindroid General', 
       description: 'Robot-ninja som kan hoppa efter dig!', 
@@ -126,10 +140,13 @@ export const LEVELS: Level[] = [
     number: 5, 
     name: 'De bortglömda ruinerna',
     description: 'Sandstormar och fallande pelare. Stenskruttar är tuffa!',
-    length: 10000,
-    bgColor: '#2d1e0a', // Sand/Brun
+    length: 22000,
+    bgColor: '#2d1e0a',
     platformColor: '#451a03',
+    atmosphereType: 'dust',
     difficulty: 5,
+    bossPoints: 10000,
+    timeLimit: 360,
     boss: { 
       name: 'Anacondrai Champion', 
       description: 'Enorm styrka och snabbhet!', 
@@ -143,20 +160,23 @@ export const LEVELS: Level[] = [
   },
   { 
     number: 6, 
-    name: 'Slutstriden mot Great Devourer',
-    description: 'Arenan går sönder. Det krävs perfekt timing för att överleva!',
-    length: 13000,
-    bgColor: '#000000', // Totalt mörker
-    platformColor: '#0f172a',
+    name: 'Slutstriden mot Overlord',
+    description: 'Den ultimata ondskan har återvänt. Endast en sann mästare kan besegra honom!',
+    length: 25000,
+    bgColor: '#000000',
+    platformColor: '#1e1b4b',
+    atmosphereType: 'void',
     difficulty: 6,
+    bossPoints: 20000,
+    timeLimit: 480,
     boss: { 
-      name: 'Great Devourer', 
-      description: 'Den gigantiska ormen. Använd Spin (Z) för att reflektera skott!', 
-      imageKey: 'enemy-oni', 
+      name: 'Overlord', 
+      description: 'Den absoluta huvudfienden. Undvik hans röda blixtar!', 
+      imageKey: 'overlord', 
       behavior: 'final',
       spriteRow: 3,
       spriteCol: 3,
-      healthMultiplier: 15,
+      healthMultiplier: 20,
       canShoot: true
     } 
   },
