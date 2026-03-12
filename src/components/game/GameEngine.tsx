@@ -495,6 +495,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
             if (Math.abs((s.x + 70) - coin.x) < 70 && Math.abs((s.y + 80) - coin.y) < 80) {
                 coin.collected = true;
                 s.score += 50;
+                s.lastReportedScore = s.score;
                 setCurrentScore(s.score);
                 s.scorePopups.push({ x: coin.x, y: coin.y, text: "+50", life: 60 });
                 playSFX('sfx_lightning_8bit.wav', 0.2);
@@ -651,7 +652,8 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                     s.combo = 0; // Reset combo vid skada
                     if (s.lives <= 0) {
                         s.active = false;
-                        const finalS = Number(s.score) || 0;
+                        const finalS = Math.max(Number(s.score) || 0, s.lastReportedScore || 0);
+                        console.log(`[v1.46] Game Over. Score: ${finalS}`);
                         setCurrentScore(finalS);
                         setTimeout(() => onGameOverRef.current(finalS), 1500);
                     } else {
@@ -740,7 +742,8 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                     s.shake = 12; s.combo = 0;
                     if (s.lives <= 0) {
                         s.active = false;
-                        const finalS = Number(s.score) || 0;
+                        const finalS = Math.max(Number(s.score) || 0, s.lastReportedScore || 0);
+                        console.log(`[v1.46] Game Over. Score: ${finalS}`);
                         setCurrentScore(finalS);
                         setTimeout(() => onGameOverRef.current(finalS), 1500);
                     } else {
