@@ -945,7 +945,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
   return (
     <div 
         ref={containerRef}
-        className={`relative w-full overflow-hidden bg-black no-select no-touch-callout ${isMobile ? 'fixed inset-0 z-[10000] h-[100dvh]' : 'aspect-video rounded-3xl border-4 border-white/10 shadow-2xl'}`}
+        className={`relative w-full h-full overflow-hidden bg-black no-select no-touch-callout ${!isMobile ? 'aspect-[16/9] rounded-3xl border-4 border-white/10 shadow-2xl' : ''}`}
     >
       <canvas ref={canvasRef} width={800} height={600} className="w-full h-full object-contain" />
 
@@ -1014,53 +1014,49 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
         </div>
       )}
 
-      {gameStarted && isMobile && (
-        <div className="absolute inset-0 z-[200] pointer-events-none overflow-hidden">
-          {/* Vänsterstyrning: Vänster/Höger pilar - Flyttade ner och tajtare */}
-          <div className="absolute bottom-4 left-2 flex gap-1 pointer-events-auto">
+          {/* Vänsterstyrning: Pilar (Exakt storlek från Bild 2) */}
+          <div className="absolute bottom-6 left-4 flex gap-1 pointer-events-auto">
             <button 
                 onPointerDown={(e)=>{ e.preventDefault(); touch.current.left=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.left=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.left=false; }}
-                style={{width:'68px',height:'68px'}}
-                className="bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-4xl shadow-2xl border border-white/20 select-none active:bg-white/40 text-white"
+                style={{width:'72px',height:'72px'}}
+                className="bg-black/30 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-2xl border border-white/10 select-none active:bg-white/20 text-white"
             >←</button>
             <button 
                 onPointerDown={(e)=>{ e.preventDefault(); touch.current.right=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.right=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.right=false; }}
-                style={{width:'68px',height:'68px'}}
-                className="bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-4xl shadow-2xl border border-white/20 select-none active:bg-white/40 text-white"
+                style={{width:'72px',height:'72px'}}
+                className="bg-black/30 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-2xl border border-white/10 select-none active:bg-white/20 text-white"
             >→</button>
           </div>
-
-          {/* Högerstyrning: Eld/Hopp/Spin - Flyttade ELD ovanför HOPP */}
-          <div className="absolute bottom-4 right-2 flex items-end gap-2 pointer-events-auto">
-            <div className="flex flex-col items-center gap-2">
-                {/* SPIN */}
+          
+          {/* Högerstyrning: SKJUT+SPIN och HOPP längst till höger (Exakt storlek från Bild 2) */}
+          <div className="absolute bottom-6 right-4 flex items-end gap-3 pointer-events-auto">
+            <div className="flex flex-col items-center gap-3">
+                {/* SPIN (🌪️) - Ovanför SKJUT */}
                 <button 
-                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }} 
-                    style={{width:'54px',height:'54px'}}
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }}
+                    style={{width:'56px',height:'56px'}}
                     className={`rounded-full border-2 font-black transition-all select-none text-[8px] tracking-widest flex items-center justify-center ${
                     spinEnergy >= 100 
-                        ? 'bg-yellow-400/90 text-black border-yellow-200 animate-pulse shadow-[0_0_20px_rgba(250,204,21,0.8)]' 
-                        : 'bg-white/5 text-white/30 border-white/10'
+                        ? 'bg-yellow-400 text-black border-yellow-200 shadow-[0_0_20px_rgba(250,204,21,0.6)] animate-pulse' 
+                        : 'bg-black/40 text-white/30 border-white/10'
                     }`}
                 >SPIN</button>
-                
-                {/* ELD (🔥) - Nu i kolumnen */}
+
+                {/* SKJUT (🔥) - Vänster om HOPP */}
                 <button 
                     onPointerDown={(e)=>{ e.preventDefault(); touch.current.fire=true; }}
-                    style={{width:'82px',height:'82px'}}
-                    className="bg-red-600/60 backdrop-blur-md rounded-full font-black text-3xl shadow-2xl border-2 border-red-400/50 active:bg-red-500/80 text-white flex items-center justify-center mb-1"
+                    style={{width:'85px',height:'85px'}}
+                    className="bg-red-700/80 backdrop-blur-md rounded-full font-black text-4xl shadow-2xl border-2 border-red-400/50 active:scale-95 transition-transform text-white flex items-center justify-center"
                 >🔥</button>
             </div>
-            
-            {/* HOPP - Nu den stora knappen längst till höger */}
+
+            {/* HOPP (Blå) - Längst till höger */}
             <button 
                 onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
-                style={{width:'90px',height:'90px'}}
-                className="bg-blue-600/60 backdrop-blur-md rounded-full font-black text-[12px] shadow-2xl border-2 border-blue-400/50 active:bg-blue-500/80 text-white flex items-center justify-center uppercase tracking-widest ml-1 mb-1"
+                style={{width:'85px',height:'85px'}}
+                className="bg-blue-600/80 backdrop-blur-md rounded-full font-black text-[12px] shadow-2xl border-2 border-blue-400/50 active:scale-95 transition-transform text-white flex items-center justify-center uppercase tracking-widest"
             >HOPP</button>
           </div>
-        </div>
-      )}
     </div>
   );
 }

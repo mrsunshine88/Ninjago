@@ -46,11 +46,16 @@ export function GameOverView({ playerName, finalScore, isHighScore, isGameWon, i
       }));
       setParticles(newParticles);
       
-      // I v1.72: Använd det nya rekordljudet ENDAST vid nytt rekord (Rank 1)
-      const audioFile = isHighScore ? '/audio/SPELA UPP NÄR MAN SLÅR REKORD.mp3' : '/audio/music_level_complete_8bit.wav';
+      // I v1.74: Använd exakt filnamn och hantera mellanslag genom att skriva ut hela sökvägen 
+      const audioFile = isHighScore 
+        ? "/audio/SPELA UPP NÄR MAN SLÅR REKORD.mp3" 
+        : "/audio/music_level_complete_8bit.wav";
+      
+      console.log(`[v1.74] Playing celebration audio: ${audioFile} (isHighScore: ${isHighScore})`);
+      
       const audio = new Audio(audioFile);
       audio.volume = isMuted ? 0 : 0.6;
-      audio.play().catch(() => {});
+      audio.play().catch(err => console.error("[v1.74] Audio play error:", err));
     }
 
     return () => clearInterval(timer);
