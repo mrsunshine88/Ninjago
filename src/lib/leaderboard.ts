@@ -26,10 +26,8 @@ function getLocalLeaderboard(): ScoreEntry[] {
 }
 
 export async function getLeaderboard(): Promise<ScoreEntry[]> {
-  // 1. Försök hämta från Firestore (Global) om nyckel finns
-  const hasFirebase = !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  if (hasFirebase) {
-    try {
+  // Try to fetch from Firestore (will use Ghost Key in firebase.ts)
+  try {
       console.log("Fetching from Firebase (DEBUG: no orderBy)...");
       const q = query(collection(db, "leaderboard"), limit(20)); // Temp remove orderBy to check index
       const snapshot = await getDocs(q);
@@ -53,8 +51,6 @@ export async function getLeaderboard(): Promise<ScoreEntry[]> {
       console.error("Firebase getLeaderboard error:", error);
       return getLocalLeaderboard();
     }
-  }
-
   // 2. Fallback till LocalStorage if Firebase not configured or not used
   return getLocalLeaderboard();
 }

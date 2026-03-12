@@ -42,16 +42,21 @@ export default function NinjagoGame() {
 
 
   const finishGame = useCallback(async (total: number) => {
+    setGameOverData(null); // Clear old data first
+    console.log(`[v1.56] Finishing game with score: ${total}. Awaiting save...`);
+    
+    // 1. Spara först (vänta på nätverket)
     const result = await saveScore({
       name: playerName,
       score: total,
       ninja: selectedNinja?.name || "Okänd",
       date: new Date().toISOString()
     });
+    
+    // 2. Sätt data och växla vy först när sparandet är bekräftat
     setGameOverData({ score: total, isHighScore: result.isHighScore });
-    const updatedLeaderboard = await getLeaderboard();
-    setLeaderboard(updatedLeaderboard);
     setGameState('gameover');
+    console.log(`[v1.56] Save confirmed. Transitioning to GameOverView.`);
   }, [playerName, selectedNinja]);
 
   const handleStart = useCallback((name: string, ninja: Ninja) => {
@@ -75,10 +80,15 @@ export default function NinjagoGame() {
     }
   }, [currentLevelIdx, finishGame]);
 
-  const handleGameOver = useCallback((totalScore: number) => {
-    setScore(totalScore);
-    setTimeout(() => finishGame(totalScore), 10);
-  }, [finishGame]);
+  const handleGameOver = useCallback(async (totalScore: number) => {
+    // v1.57 Expert Sync: Ensure we have the absolute max score
+    const currentStored = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
+    const finalS = Math.max(score, totalScore, currentStored);
+    
+    console.log(`[v1.57] handleGameOver triggered. Score: ${finalS}. Awaiting finishGame...`);
+    setScore(finalS); // Update local state for display
+    await finishGame(finalS); // This function now awaits the network call
+  }, [score, finishGame]);
 
   const handleRetry = useCallback(() => {
     // Spara poängen innan retry (om spelet kördes)

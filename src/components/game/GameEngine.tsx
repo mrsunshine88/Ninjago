@@ -56,6 +56,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
     started: false,
     active: true,
     score: Number(initialScore) || 0,
+    maxScore: Number(initialScore) || 0, // High-water mark for v1.55
     energy: 0,
     lastReportedScore: Number(initialScore) || 0, // Extra sync-fält
     cameraX: 0,
@@ -451,10 +452,13 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                 localStorage.setItem('ninjago_emergency_score', String(s.score));
             }
             
-            // Camera
-            s.cameraX = Math.max(s.cameraX, s.x - 200);
-            s.cameraX = Math.min(s.cameraX, level.length - 800);
+            // Camera (Fixed v1.55: Bi-directional following)
+            const targetX = s.x - 300;
+            s.cameraX = Math.min(Math.max(0, targetX), level.length - 800);
             s.energy = Math.min(100, s.energy + 0.2); 
+            
+            // Per-frame mirroring for ultimate safety
+            if (s.score > 0) localStorage.setItem('ninjago_emergency_score', String(s.score));
         }
         
         if ((state.current.fireReq || touch.current.fire) && !s.spin) { 
@@ -514,8 +518,9 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
             if (Math.abs((s.x + 70) - coin.x) < 70 && Math.abs((s.y + 80) - coin.y) < 80) {
                 coin.collected = true;
                 s.score += 50;
-                s.lastReportedScore = s.score;
-                if (typeof window !== 'undefined') localStorage.setItem('ninjago_emergency_score', String(s.score));
+                s.maxScore = Math.max(s.maxScore, s.score); // v1.55
+                s.lastReportedScore = s.maxScore;
+                if (typeof window !== 'undefined') localStorage.setItem('ninjago_emergency_score', String(s.maxScore));
                 setCurrentScore(s.score);
                 s.scorePopups.push({ x: coin.x, y: coin.y, text: "+50", life: 60 });
                 playSFX('sfx_lightning_8bit.wav', 0.2);
@@ -644,8 +649,9 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                     s.comboTimer = 120; // 2 sekunder
                     const bonus = s.combo > 1 ? s.combo * 50 : 0;
                     s.score += 100 + bonus;
-                    s.lastReportedScore = s.score; // Sync ref
-                    if (typeof window !== 'undefined') localStorage.setItem('ninjago_emergency_score', String(s.score));
+                    s.maxScore = Math.max(s.maxScore, s.score); // v1.55
+                    s.lastReportedScore = s.maxScore; // Sync ref
+                    if (typeof window !== 'undefined' && s.y > 700) localStorage.setItem('ninjago_emergency_score', String(s.maxScore));
                     if (s.combo > 1) {
                         s.comboTextVal = s.combo;
                         s.comboTextLife = 90;
@@ -675,9 +681,8 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                         s.active = false;
                         let finalScoreBackup = 0;
                         if (typeof window !== 'undefined') finalScoreBackup = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
-                        const finalS = Math.max(Number(s.score) || 0, s.lastReportedScore || 0, finalScoreBackup);
-                        console.log(`[v1.47] Game Over. Final Score: ${finalS}`);
-                        if (typeof window !== 'undefined') localStorage.removeItem('ninjago_emergency_score');
+                        const finalS = Math.max(Number(s.maxScore) || 0, s.lastReportedScore || 0, Number(localStorage.getItem('ninjago_emergency_score')) || 0);
+                        console.log(`[v1.56] Game Over (Enemy). Final: ${finalS}`);
                         setCurrentScore(finalS);
                         setTimeout(() => onGameOverRef.current(finalS), 1500);
                     } else {
@@ -768,9 +773,8 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                         s.active = false;
                         let finalScoreBackup = 0;
                         if (typeof window !== 'undefined') finalScoreBackup = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
-                        const finalS = Math.max(Number(s.score) || 0, s.lastReportedScore || 0, finalScoreBackup);
-                        console.log(`[v1.47] Game Over. Final Score: ${finalS}`);
-                        if (typeof window !== 'undefined') localStorage.removeItem('ninjago_emergency_score');
+                        const finalS = Math.max(Number(s.maxScore) || 0, s.lastReportedScore || 0, finalScoreBackup);
+                        console.log(`[v1.56] Game Over (Proj). Final: ${finalS}`);
                         setCurrentScore(finalS);
                         setTimeout(() => onGameOverRef.current(finalS), 1500);
                     } else {
@@ -874,10 +878,8 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                 } else if (s.active) { 
                     s.active = false;
                     playSFX('lolo_s-down-474082.mp3', 1.0); 
-                    let finalScoreBackup = 0;
-                    if (typeof window !== 'undefined') finalScoreBackup = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
-                    const finalS = Math.max(Number(s.score) || 0, s.lastReportedScore || 0, finalScoreBackup);
-                    console.log(`[v1.50] Game Over (Boss Touch). Final: ${finalS}`);
+                    const finalS = Math.max(Number(s.maxScore) || 0, s.lastReportedScore || 0, Number(localStorage.getItem('ninjago_emergency_score')) || 0);
+                    console.log(`[v1.56] Game Over (Boss Touch). Final: ${finalS}`);
                     setCurrentScore(finalS);
                     setTimeout(() => onGameOverRef.current(finalS), 1500);
                 }
@@ -1027,10 +1029,10 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
             >→</button>
           </div>
 
-          {/* Högerstyrning: Eld/Hopp/Spin - Flyttade SPIN ovanför hopp */}
+          {/* Högerstyrning: Eld/Hopp/Spin - Flyttade ELD ovanför HOPP */}
           <div className="absolute bottom-4 right-2 flex items-end gap-2 pointer-events-auto">
             <div className="flex flex-col items-center gap-2">
-                {/* SPIN – flyttad ovanför hopp */}
+                {/* SPIN */}
                 <button 
                     onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }} 
                     style={{width:'54px',height:'54px'}}
@@ -1041,18 +1043,20 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                     }`}
                 >SPIN</button>
                 
+                {/* ELD (🔥) - Nu i kolumnen */}
                 <button 
-                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.fire=true; }}
                     style={{width:'82px',height:'82px'}}
-                    className="bg-blue-600/60 backdrop-blur-md rounded-full font-black text-[12px] shadow-2xl border-2 border-blue-400/50 active:bg-blue-500/80 text-white flex items-center justify-center uppercase tracking-widest mb-1"
-                >HOPP</button>
+                    className="bg-red-600/60 backdrop-blur-md rounded-full font-black text-3xl shadow-2xl border-2 border-red-400/50 active:bg-red-500/80 text-white flex items-center justify-center mb-1"
+                >🔥</button>
             </div>
             
+            {/* HOPP - Nu den stora knappen längst till höger */}
             <button 
-                onPointerDown={(e)=>{ e.preventDefault(); touch.current.fire=true; }}
+                onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
                 style={{width:'90px',height:'90px'}}
-                className="bg-red-600/60 backdrop-blur-md rounded-full font-black text-3xl shadow-2xl border-2 border-red-400/50 active:bg-red-500/80 text-white flex items-center justify-center ml-1 mb-1"
-            >🔥</button>
+                className="bg-blue-600/60 backdrop-blur-md rounded-full font-black text-[12px] shadow-2xl border-2 border-blue-400/50 active:bg-blue-500/80 text-white flex items-center justify-center uppercase tracking-widest ml-1 mb-1"
+            >HOPP</button>
           </div>
         </div>
       )}
