@@ -27,7 +27,7 @@ function getLocalLeaderboard(): ScoreEntry[] {
 
 export async function getLeaderboard(): Promise<ScoreEntry[]> {
   // 1. Försök hämta från Firestore (Global) om nyckel finns
-  const hasFirebase = !!(process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
+  const hasFirebase = !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
   if (hasFirebase) {
     try {
       console.log("Fetching from Firebase (DEBUG: no orderBy)...");
@@ -67,6 +67,7 @@ export async function saveScore(entry: ScoreEntry): Promise<{ isHighScore: boole
     return { isHighScore: false };
   }
   entry.score = safeScore;
+  console.log(`[v1.50] Attempting global save for ${entry.name}: ${entry.score}`);
 
   // 1. Spara till Firestore (Global)
   try {

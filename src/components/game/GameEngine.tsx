@@ -62,6 +62,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
     timeLeft: 0,
     highScore: 0,
     x: 100, y: 350, dx: 0, dy: 0,
+    frames: 0, // Frame counter for sync
     fR: true, jump: false, jumpReq: false, spin: false, spinT: 0, 
     enemies: [] as any[],
     projs: [] as any[],
@@ -126,6 +127,16 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
         if (lb && lb.length > 0) {
             setHighScore(lb[0].score);
             state.current.highScore = lb[0].score;
+        }
+        // Emergency Recovery: Om poängen är 0 på Nivå 1 men vi har något i minnet...
+        if (typeof window !== 'undefined' && state.current.score === 0) {
+            const saved = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
+            if (saved > 0) {
+                console.log(`[v1.49] Recovered score from storage: ${saved}`);
+                state.current.score = saved;
+                state.current.lastReportedScore = saved;
+                setCurrentScore(saved);
+            }
         }
     };
     loadLB();
@@ -433,10 +444,19 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
         if (touch.current.jump) s.jumpReq = true;
         if (s.jumpReq && !s.jump && onGround) { s.dy = -23; s.jump = true; s.jumpReq = false; }
         if (s.jump || !onGround) { if (frames % 60 === 0) s.jumpReq = false; }
-        if (s.y > 650) { s.y = 400; s.dy = 0; }
-
-        s.cameraX = Math.max(0, Math.min(s.x - 300, level.length - 800));
-        s.energy = Math.min(100, s.energy + 0.2); 
+        if (s.active) {
+            s.frames++;
+            // Bulletproof Sync: Spara till localStorage varje sekund
+            if (s.frames % 60 === 0 && s.score > 0) {
+                localStorage.setItem('ninjago_emergency_score', String(s.score));
+            }
+            
+            // Camera
+            s.cameraX = Math.max(s.cameraX, s.x - 200);
+            s.cameraX = Math.min(s.cameraX, level.length - 800);
+            ctx.translate(-s.cameraX, 0);
+            s.energy = Math.min(100, s.energy + 0.2); 
+        }
         
         if ((state.current.fireReq || touch.current.fire) && !s.spin) { 
             s.projs.push({ x: s.fR?s.x+110:s.x+30, y: s.y+80, dx: s.fR?22:-22, c: ninja.color });  
@@ -855,7 +875,10 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                 } else if (s.active) { 
                     s.active = false;
                     playSFX('lolo_s-down-474082.mp3', 1.0); 
-                    const finalS = Number(s.score) || 0;
+                    let finalScoreBackup = 0;
+                    if (typeof window !== 'undefined') finalScoreBackup = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
+                    const finalS = Math.max(Number(s.score) || 0, s.lastReportedScore || 0, finalScoreBackup);
+                    console.log(`[v1.50] Game Over (Boss Touch). Final: ${finalS}`);
                     setCurrentScore(finalS);
                     setTimeout(() => onGameOverRef.current(finalS), 1500);
                 }

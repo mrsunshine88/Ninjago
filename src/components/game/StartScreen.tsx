@@ -272,10 +272,9 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
       </div>
 
       {/* Version Tag - v1.39, nedre vänster */}
-      <div className="absolute bottom-4 left-4 text-white/50 text-[12px] font-black uppercase tracking-[0.2em] z-50 pointer-events-none select-none italic">
-        v1.48
+      <div className="absolute bottom-4 left-4 text-white/50 text-[12px] font-black uppercase tracking-[0.2em] z-50 pointer-events-none select-none italic flex items-center gap-2">
+        v1.50 <span className={`w-1.5 h-1.5 rounded-full ${process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? 'bg-green-500' : 'bg-red-500'}`} title={process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? 'Firebase OK' : 'No Config'} />
       </div>
-
       {/* Credit Text - alltid centrerat längst ned, krockar ej med version */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[#FFD700] text-[11px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] z-50 pointer-events-none select-none whitespace-nowrap">
         Game Idea & Design by Lukas Persson
