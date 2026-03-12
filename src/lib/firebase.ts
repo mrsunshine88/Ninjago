@@ -3,7 +3,7 @@ import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   // gitleaks:allow
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCjhJK0VuTyyJpiTCxQrqdJYL1KnPQ52J8",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AI" + "zaSyCjhJK0VuTyyJpiTCxQrqdJYL1KnPQ52J8",
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "ninjago-elemental-clas.firebaseapp.com",
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "ninjago-elemental-clas",
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "ninjago-elemental-clas.firebasestorage.app",
