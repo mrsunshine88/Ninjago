@@ -55,8 +55,10 @@ export default function NinjagoGame() {
     
     // 2. Sätt data och växla vy först när sparandet är bekräftat
     setGameOverData({ score: total, isHighScore: result.isHighScore });
+    const freshLeaderboard = await getLeaderboard();
+    setLeaderboard(freshLeaderboard);
     setGameState('gameover');
-    console.log(`[v1.56] Save confirmed. Transitioning to GameOverView.`);
+    console.log(`[v1.59] Save confirmed & Leaderboard refreshed.`);
   }, [playerName, selectedNinja]);
 
   const handleStart = useCallback((name: string, ninja: Ninja) => {

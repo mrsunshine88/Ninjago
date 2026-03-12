@@ -602,12 +602,13 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                     e.jumpMode = dist < 0 ? 'left' : 'right';
                     e.dx = e.jumpMode === 'left' ? -(baseSpeed + 3) : (baseSpeed + 3);
                 }
-                else if (!playerIsAbove) {
-                    // Springer mot spelaren på samma plan (aldrig hoppa upp)
-                    e.jumpMode = null; 
-                    e.dx = dist > 0 ? baseSpeed : -baseSpeed; 
-                    // ALDRIG hoppa uppåt – tag bort den gamla upphopp-logiken helt
-                }
+        if (s.y > 600 && s.active) { 
+            s.active = false;
+            const finalS = Math.max(Number(s.score) || 0, Number(s.maxScore) || 0);
+            console.log(`[v1.59] Fall Death. Final Score: ${finalS}`);
+            setCurrentScore(finalS);
+            onGameOverRef.current(finalS); 
+        }
                 else {
                     // Spelaren är ovanför – patrullera istället, hoppa INTE
                     e.jumpMode = null;

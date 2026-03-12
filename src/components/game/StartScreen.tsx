@@ -277,7 +277,7 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
 
       {/* Version Tag - v1.39, nedre vänster */}
       <div className="absolute bottom-4 left-4 text-white/50 text-[12px] font-black uppercase tracking-[0.2em] z-50 pointer-events-none select-none italic flex items-center gap-2">
-        v1.57 <span className={`w-1.5 h-1.5 rounded-full bg-green-500`} title="Stealth Key Active" />
+        v1.59 <span className={`w-1.5 h-1.5 rounded-full bg-green-500`} title="Stealth Key Active" />
       </div>
       {/* Credit Text - alltid centrerat längst ned, krockar ej med version */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[#FFD700] text-[11px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] z-50 pointer-events-none select-none whitespace-nowrap">
