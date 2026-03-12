@@ -93,7 +93,7 @@ export function StartScreen({ onStart, scores }: StartScreenProps) {
         onClick={handleLogoClick}
       >
         <div className="inline-block p-1 bg-white/10 rounded-full mb-2 backdrop-blur-md border border-white/20 shadow-2xl overflow-hidden">
-          <img src="/icon.png" alt="Ninjago" className="w-32 h-32 object-cover rounded-full" />
+          <img src="/LNERI2019.jpg" alt="Ninjago" className="w-32 h-32 object-cover rounded-full" />
         </div>
         <h1 className="text-6xl md:text-8xl font-black tracking-tighter uppercase italic high-score-text drop-shadow-[0_5px_15px_rgba(0,0,0,0.8)]">
           Ninjago

@@ -1,8 +1,8 @@
-const CACHE_NAME = 'ninjago-v2';
+const CACHE_NAME = 'ninjago-v3';
 const ASSETS = [
   '/',
   '/manifest.json',
-  '/icon.png',
+  '/LNERI2019.jpg',
   '/audio/ninjago_menu_music_8bit.wav'
 ];
 

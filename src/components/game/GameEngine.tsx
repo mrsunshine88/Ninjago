@@ -353,7 +353,7 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
       {!gameStarted && (
         <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-black/85 backdrop-blur-3xl px-12 text-center text-white">
             <div className={`bg-white/10 rounded-full mb-6 p-4 border border-white/20 animate-pulse overflow-hidden ${isMobile ? 'w-20 h-20' : 'w-32 h-32'}`}>
-                <img src="/icon.png" className="w-full h-full object-cover rounded-full" alt="Ninjago" />
+                <img src="/LNERI2019.jpg" className="w-full h-full object-cover rounded-full" alt="Ninjago" />
             </div>
             <h2 className={`${isMobile ? 'text-3xl' : 'text-6xl'} font-black italic mb-2 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 uppercase`}>BANA {level.number}</h2>
             <h3 className={`${isMobile ? 'text-xl' : 'text-4xl'} font-bold text-white uppercase mb-4 tracking-widest`}>{level.name}</h3>
