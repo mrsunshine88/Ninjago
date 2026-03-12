@@ -26,15 +26,15 @@ function getLocalLeaderboard(): ScoreEntry[] {
 }
 
 export async function getLeaderboard(): Promise<ScoreEntry[]> {
-    // definitive v1.65: Raw fetch + client-side sort (No Index required)
+    // [v1.70] Global Sync: Raw fetch from "scores" collection
   try {
-    const scoresCol = collection(db, "leaderboard");
+    const scoresCol = collection(db, "scores");
     const snapshot = await getDocs(scoresCol);
     
     // Mappa datan och logga antal för felsökning
     const data = snapshot.docs.map(doc => {
       const d = doc.data();
-      const val = Number(d.score !== undefined ? d.score : d.points) || 0;
+      const val = Number(d.score !== undefined ? d.score : (d.points !== undefined ? d.points : 0)) || 0;
       return {
         name: d.name || "Anonym Ninja",
         score: val,
@@ -45,29 +45,33 @@ export async function getLeaderboard(): Promise<ScoreEntry[]> {
     
     // Sortera lokalt (Client-side sort)
     const sorted = data.sort((a, b) => Number(b.score) - Number(a.score));
-    console.log(`[v1.65] Returning ${sorted.length} sorted scores to UI`);
+    console.log(`[v1.70] Global Sync: Found ${sorted.length} scores from cloud`);
     
     if (sorted.length === 0) return getLocalLeaderboard();
     return sorted.slice(0, 5);
   } catch (error) {
-    console.error("Leaderboard Error:", error);
+    console.error("Global Leaderboard Error:", error);
     return getLocalLeaderboard();
   }
 }
 
 export async function saveScore(entry: ScoreEntry): Promise<{ isHighScore: boolean }> {
-  console.log(`Saving score for ${entry.name}: ${entry.score}`);
   const safeScore = Number(entry.score);
   if (isNaN(safeScore) || safeScore <= 0) {
     console.warn("Attempted to save non-positive or invalid score, aborting.");
     return { isHighScore: false };
   }
   entry.score = safeScore;
-  console.log(`[v1.65] Attempting global save for ${entry.name}: ${entry.score}`);
+  
+  // 1. Hämta nuvarande topplista INNAN vi sparar för att veta gällande rekord
+  const currentLeaderboard = await getLeaderboard();
+  const currentBest = currentLeaderboard.length > 0 ? currentLeaderboard[0].score : 0;
 
-  // 1. Spara till Firestore (Global)
+  console.log(`[v1.72] Attempting global save for ${entry.name}: ${entry.score}. Current best: ${currentBest}`);
+
+  // 2. Spara till Firestore (Global Collection: scores)
   try {
-    await addDoc(collection(db, "leaderboard"), {
+    await addDoc(collection(db, "scores"), {
       ...entry,
       timestamp: new Date()
     });
@@ -75,15 +79,18 @@ export async function saveScore(entry: ScoreEntry): Promise<{ isHighScore: boole
     console.error("Firestore save error:", e);
   }
 
-  // 2. Spara lokalt och räkna ut rekord
-  const current = await getLeaderboard();
-  const isHighScore = current.length > 0 && entry.score > current[0].score;
-  const isFirstEver = current.length === 0 && entry.score > 0;
+  // 3. v1.72: ENDAST RECORD om man blir absolut #1 på listan
+  const isNewGlobalBest = entry.score > currentBest;
+  const isFirstEver = currentLeaderboard.length === 0 && entry.score > 0;
+  const isRank1 = isNewGlobalBest || isFirstEver;
 
-  const updated = [...current, entry]
+  // Spara lokalt för UI-listan
+  const updatedLocalList = [...currentLeaderboard, entry]
     .sort((a, b) => b.score - a.score)
     .slice(0, 15);
-  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(updated));
+  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(updatedLocalList));
   
-  return { isHighScore: (isHighScore || isFirstEver) && updated[0].score === entry.score };
+  console.log(`[v1.72] Rank 1 Check: ${isRank1 ? 'YES (Celebration!)' : 'NO'}`);
+  
+  return { isHighScore: isRank1 };
 }

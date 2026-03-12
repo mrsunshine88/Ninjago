@@ -103,6 +103,9 @@ export default function NinjagoGame() {
   }, []);
 
   const handleReset = useCallback(() => {
+    document.body.style.overflow = '';
+    document.body.style.touchAction = '';
+    document.body.style.overscrollBehavior = '';
     setScore(0);
     setRetryCount(0);
     setGameState('menu');

@@ -57,7 +57,7 @@ export function Leaderboard({ scores }: LeaderboardProps) {
           </table>
         ) : (
           <div className="p-8 text-center italic text-muted-foreground">
-            Hämtar senaste rekorden...
+            Inga rekord i molnet än. Bli den första!
           </div>
         )}
       </div>
