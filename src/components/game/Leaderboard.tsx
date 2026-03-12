@@ -34,7 +34,7 @@ export function Leaderboard({ scores }: LeaderboardProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/30">
-              {scores.slice(0, 5).map((entry, idx) => (
+              {Array.isArray(scores) && scores.slice(0, 5).map((entry, idx) => (
                 <tr key={idx} className={`hover:bg-primary/5 transition-colors ${idx === 0 ? 'bg-primary/10' : ''}`}>
                   <td className="px-4 py-3 text-sm font-bold">
                     {idx === 0 ? (
@@ -50,7 +50,7 @@ export function Leaderboard({ scores }: LeaderboardProps) {
                     </div>
                   </td>
                   <td className="px-4 py-3 font-mono font-bold text-primary">
-                    {(entry.score || 0).toLocaleString()}
+                    {(Number(entry.score) || 0).toLocaleString()}
                   </td>
                 </tr>
               ))}

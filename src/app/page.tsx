@@ -23,7 +23,11 @@ export default function NinjagoGame() {
 
   // Load leaderboard and settings on mount
   useEffect(() => {
-    setLeaderboard(getLeaderboard());
+    const loadData = async () => {
+        const scores = await getLeaderboard();
+        setLeaderboard(scores);
+    };
+    loadData();
     const savedMute = localStorage.getItem('ninjago_muted') === 'true';
     setIsMuted(savedMute);
   }, []);
@@ -37,15 +41,16 @@ export default function NinjagoGame() {
   }, []);
 
 
-  const finishGame = useCallback((total: number) => {
-    const result = saveScore({
+  const finishGame = useCallback(async (total: number) => {
+    const result = await saveScore({
       name: playerName,
       score: total,
       ninja: selectedNinja?.name || "Okänd",
       date: new Date().toISOString()
     });
     setGameOverData({ score: total, isHighScore: result.isHighScore });
-    setLeaderboard(getLeaderboard());
+    const updatedLeaderboard = await getLeaderboard();
+    setLeaderboard(updatedLeaderboard);
     setGameState('gameover');
   }, [playerName, selectedNinja]);
 

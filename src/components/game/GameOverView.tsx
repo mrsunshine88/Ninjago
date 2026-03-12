@@ -98,11 +98,13 @@ export function GameOverView({ playerName, finalScore, isHighScore, isMuted, onR
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          <h1 className="text-5xl md:text-7xl font-black uppercase text-primary tracking-tighter">
+        <div className="space-y-3 p-4 bg-white/5 backdrop-blur-md rounded-3xl border border-white/10 shadow-2xl animate-in slide-in-from-bottom duration-1000">
+          <h1 className="text-4xl md:text-6xl font-black uppercase text-primary tracking-tighter drop-shadow-lg">
             BRA KÄMPAT!
           </h1>
-          <p className="text-xl text-muted-foreground italic font-medium">Träna mer i klostret för att slå rekordet!</p>
+          <p className="text-xl text-yellow-500 font-black italic tracking-widest uppercase animate-pulse">
+            🥷 Träna mer - du är snart en mästare! 🥷
+          </p>
         </div>
       )}
 
@@ -121,20 +123,12 @@ export function GameOverView({ playerName, finalScore, isHighScore, isMuted, onR
 
         <div className="flex flex-col gap-4 mt-8">
             <button 
-                onClick={onRetry}
-                onPointerDown={(e) => { e.preventDefault(); onRetry?.(); }}
-                className="w-full h-20 bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800 text-3xl font-black uppercase tracking-widest group rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-[0_12px_0_rgb(127,29,29)] active:shadow-none active:translate-y-3 flex items-center justify-center"
-            >
-                Försök Igen
-                <RefreshCcw className="ml-4 w-8 h-8 group-hover:rotate-180 transition-transform duration-500" />
-            </button>
-
-            <button 
                 onClick={onReset}
                 onPointerDown={(e) => { e.preventDefault(); onReset(); }}
-                className="w-full h-16 border-4 border-white/20 bg-white/5 text-white hover:bg-white/10 text-xl font-black uppercase tracking-widest rounded-2xl flex items-center justify-center"
+                className="w-full h-20 bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800 text-3xl font-black uppercase tracking-widest group rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-[0_12px_0_rgb(127,29,29)] active:shadow-none active:translate-y-3 flex items-center justify-center"
             >
                 Huvudmeny
+                <RefreshCcw className="ml-4 w-8 h-8 group-hover:rotate-180 transition-transform duration-500" />
             </button>
         </div>
         

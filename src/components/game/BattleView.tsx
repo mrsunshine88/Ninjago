@@ -39,11 +39,8 @@ export function BattleView({
           <span className="text-3xl font-black text-primary italic leading-none">{(level?.number || 1)} / 6</span>
         </div>
         
-        <div className="text-center hidden md:block">
-          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.2em]">Nuvarande Ninja</span>
-          <div className="text-xl font-black text-accent italic flex items-center gap-2 drop-shadow-sm">
-            <Sword className="w-5 h-5" /> {playerName || 'Ninja'} ({ninja?.name || 'Kai'})
-          </div>
+        <div className="text-center">
+          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.2em]">{playerName || 'Ninja'}</span>
         </div>
 
         <div className="flex items-center gap-4">

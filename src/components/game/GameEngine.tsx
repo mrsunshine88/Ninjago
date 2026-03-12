@@ -20,7 +20,7 @@ interface GameEngineProps {
   onLevelComplete: (points: number) => void;
 }
 
-export function GameEngine({ ninja, level, playerName, initialScore, isMuted, onGameOver, onLevelComplete }: GameEngineProps) {
+export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted, onGameOver, onLevelComplete }: GameEngineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -28,7 +28,7 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
   const [gameStarted, setGameStarted] = useState(false);
   const [showLevelIntro, setShowLevelIntro] = useState(false);
   const cleanedImages = useRef<Record<string, HTMLCanvasElement>>({});
-  const [currentScore, setCurrentScore] = useState(initialScore);
+  const [currentScore, setCurrentScore] = useState(Number(initialScore) || 0);
   const [spinEnergy, setSpinEnergy] = useState(0);
   const [displayTime, setDisplayTime] = useState(0);
 
@@ -55,7 +55,7 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
   const state = useRef({
     started: false,
     active: true,
-    score: initialScore,
+    score: Number(initialScore) || 0,
     energy: 0,
     cameraX: 0,
     timeLeft: 0,
@@ -78,6 +78,8 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
     coins: [] as {x: number, y: number, collected: boolean}[],
     comboTextLife: 0,   // Hur länge combo-texten visas
     comboTextVal: 0,    // Vilket combovärde att visa
+    fireReq: false,     // Skjut-begäran (för klick istället för hold)
+    scorePopups: [] as {x: number, y: number, text: string, life: number}[],
   });
 
   const touch = useRef({ left: false, right: false, jump: false, fire: false, spin: false });
@@ -118,11 +120,14 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
     };
     window.addEventListener('beforeinstallprompt', handleInstallPrompt);
 
-    const lb = getLeaderboard();
-    if (lb && lb.length > 0) {
-        setHighScore(lb[0].score);
-        state.current.highScore = lb[0].score;
-    }
+    const loadLB = async () => {
+        const lb = await getLeaderboard();
+        if (lb && lb.length > 0) {
+            setHighScore(lb[0].score);
+            state.current.highScore = lb[0].score;
+        }
+    };
+    loadLB();
 
     const heroFiles = ['kai.png', 'Jay.png', 'zane.png', 'Cole.png', 'Lloyd.png', 'Nya.png'];
     heroFiles.forEach(f => {
@@ -138,8 +143,11 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
     });
 
     const handleKey = (e: KeyboardEvent, v: boolean) => {
-        keys.current[e.code] = v;
         const k = e.key.toLowerCase();
+        if (k === 'x' && v && !keys.current['KeyX']) {
+            state.current.fireReq = true;
+        }
+        keys.current[e.code] = v;
         if (k === 'x') keys.current['KeyX'] = v;
         if (k === 'z') {
             keys.current['KeyZ'] = v;
@@ -168,6 +176,14 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
   const handleStartGame = async () => {
     state.current.started = true;
     setGameStarted(true);
+    
+    // Automatisk helskärm på mobil
+    try {
+        if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+        }
+    } catch (e) {}
+    
     playSFX('lolo_s-start-474092.mp3', 0.8);
   };
 
@@ -274,8 +290,8 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
 
         // Bossens HP: Buffad så de inte dör på ett skott. Bas-HP 45 istället för 15.
         const bossHP = Math.min(300, (level.boss?.healthMultiplier || 1) * 45);
-        // Flytta bossen till len - 800 så den hamnar mitt i sista vyn
-        state.current.boss = { x: len - 800, y: 100, w: 500, h: 500, hp: bossHP, max: bossHP, active: false, img: bossImg.toLowerCase(), attackCd: 120, hitT: 0 };
+        // Flytta bossen till len - 400 så den hamnar på höger sida och spelaren ser den komma
+        state.current.boss = { x: len - 400, y: 100, w: 500, h: 500, hp: bossHP, max: bossHP, active: false, img: bossImg.toLowerCase(), attackCd: 120, hitT: 0 };
         state.current.timeLeft = level?.timeLimit || 120;
 
         // Generera mynt/kristaller på plattformar
@@ -327,7 +343,16 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
         frames++;
         const s = state.current;
         const now = Date.now();
-        if (now - lastTime >= 1000) { s.timeLeft = Math.max(0, s.timeLeft - 1); lastTime = now; if (s.timeLeft <= 0) { s.active = false; onGameOverRef.current(s.score); } }
+        if (now - lastTime >= 1000) { 
+            s.timeLeft = Math.max(0, s.timeLeft - 1); 
+            lastTime = now; 
+            if (s.timeLeft <= 0 && s.active) { 
+                s.active = false; 
+                const finalS = Number(s.score) || 0;
+                setCurrentScore(finalS);
+                setTimeout(() => onGameOverRef.current(finalS), 1500); 
+            } 
+        }
 
         ctx.fillStyle = level.bgColor || '#1a140f';
         ctx.fillRect(0, 0, 800, 600);
@@ -412,9 +437,10 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
         s.cameraX = Math.max(0, Math.min(s.x - 300, level.length - 800));
         s.energy = Math.min(100, s.energy + 0.2); 
         
-        if ((keys.current['KeyX'] || touch.current.fire) && !s.spin) { 
+        if ((state.current.fireReq || touch.current.fire) && !s.spin) { 
             s.projs.push({ x: s.fR?s.x+110:s.x+30, y: s.y+80, dx: s.fR?22:-22, c: ninja.color });  
             touch.current.fire = false; 
+            state.current.fireReq = false; // Konsumera skott-begäran
             
             // Olika ljud för olika ninjor
             let shotSFX = 'sfx_lightning_8bit.wav';
@@ -464,15 +490,17 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
         // --- MYNT/KRISTALLER ---
         s.coins.forEach((coin, ci) => {
             if (coin.collected) return;
-            // Kolla kollision med spelaren
-            if (Math.abs((s.x + 70) - coin.x) < 50 && Math.abs((s.y + 80) - coin.y) < 50) {
+            // Kolla kollision med spelaren (lite mer förlåtande radie)
+            if (Math.abs((s.x + 70) - coin.x) < 70 && Math.abs((s.y + 80) - coin.y) < 80) {
                 coin.collected = true;
                 s.score += 50;
+                setCurrentScore(s.score);
+                s.scorePopups.push({ x: coin.x, y: coin.y, text: "+50", life: 60 });
                 playSFX('sfx_lightning_8bit.wav', 0.2);
-                for (let k = 0; k < 8; k++) s.particles.push({
+                for (let k = 0; k < 12; k++) s.particles.push({
                     x: coin.x, y: coin.y,
-                    dx: (Math.random()-0.5)*8, dy: -Math.random()*6,
-                    life: 30, size: 4, color: '#ffcc00', type: 'spark'
+                    dx: (Math.random()-0.5)*10, dy: -Math.random()*8,
+                    life: 35, size: 5, color: '#ffcc00', type: 'spark'
                 });
                 return;
             }
@@ -621,7 +649,9 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
                     s.combo = 0; // Reset combo vid skada
                     if (s.lives <= 0) {
                         s.active = false;
-                        setTimeout(() => onGameOverRef.current(s.score), 1500);
+                        const finalS = Number(s.score) || 0;
+                        setCurrentScore(finalS);
+                        setTimeout(() => onGameOverRef.current(finalS), 1500);
                     } else {
                         // Respawn med invincibility
                         s.invincible = 120; // 2 sekunder
@@ -670,7 +700,8 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
             s.boss.attackCd--;
             if (s.boss.attackCd <= 0) {
                 const bX = s.boss.x + s.boss.w/2, bY = s.boss.y + s.boss.h/2;
-                const angle = Math.atan2((s.y + 80) - bY, (s.x + 70) - bX);
+                // Siktar lite lägre mot marken (s.y + 140) för att göra det lättare att undvika
+                const angle = Math.atan2((s.y + 140) - bY, (s.x + 70) - bX);
                 
                 // Unika attacker baserat på nivå
                 let speed = 6 + level.number * 1.5;
@@ -697,15 +728,19 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
             ctx.fillStyle = bpG; ctx.beginPath(); ctx.arc(bp.x, bp.y, bp.r, 0, Math.PI*2); ctx.fill();
             
             if (Math.hypot(bp.x - (s.x + 70), bp.y - (s.y + 80)) < bp.r + 40 && !s.spin && s.invincible === 0) { 
-                if (bp.type === 'ice') { s.dx *= 0.3; }
-                else if (s.active) {
+                if (bp.type === 'ice') { s.dx *= 0.3; } // Is saktar ner...
+                
+                // ALLA skott (inklusive is) skadar nu spelaren
+                if (s.active) {
                     s.lives--;
                     setLives(s.lives);
                     playSFX('lolo_s-down-474082.mp3', 0.8);
                     s.shake = 12; s.combo = 0;
                     if (s.lives <= 0) {
                         s.active = false;
-                        setTimeout(() => onGameOverRef.current(s.score), 1500);
+                        const finalS = Number(s.score) || 0;
+                        setCurrentScore(finalS);
+                        setTimeout(() => onGameOverRef.current(finalS), 1500);
                     } else {
                         s.invincible = 120;
                         s.x = Math.max(100, s.cameraX + 50);
@@ -738,6 +773,21 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
             ctx.shadowBlur = 20; ctx.shadowColor = '#ff8800';
             ctx.textAlign = 'center';
             ctx.fillText(`${s.comboTextVal}× COMBO! +${s.comboTextVal * 50}p`, s.x + 70, s.y - 20);
+            ctx.restore();
+        }
+
+        // Score popups (+50 etc)
+        for (let i = s.scorePopups.length - 1; i >= 0; i--) {
+            const p = s.scorePopups[i];
+            p.y -= 1.5;
+            p.life--;
+            if (p.life <= 0) { s.scorePopups.splice(i, 1); continue; }
+            ctx.save();
+            ctx.globalAlpha = p.life / 60;
+            ctx.font = 'bold 24px Orbitron, sans-serif';
+            ctx.fillStyle = '#ffcc00';
+            ctx.textAlign = 'center';
+            ctx.fillText(p.text, p.x, p.y);
             ctx.restore();
         }
 
@@ -792,7 +842,8 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
                 } else if (s.active) { 
                     s.active = false;
                     playSFX('lolo_s-down-474082.mp3', 1.0); 
-                    const finalS = s.score;
+                    const finalS = Number(s.score) || 0;
+                    setCurrentScore(finalS);
                     setTimeout(() => onGameOverRef.current(finalS), 1500);
                 }
               }
@@ -839,7 +890,13 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
             if (s.shake < 0.2) s.shake = 0;
         }
 
-        if (frames % 3 === 0) { setCurrentScore(s.score); setSpinEnergy(s.energy); setDisplayTime(s.timeLeft); setLives(s.lives); }
+        if (frames % 3 === 0) { 
+            const safeScore = Number(s.score) || 0;
+            setCurrentScore(safeScore); 
+            setSpinEnergy(s.energy); 
+            setDisplayTime(s.timeLeft); 
+            setLives(s.lives); 
+        }
         raf = requestAnimationFrame(loop);
     };
 
@@ -920,9 +977,9 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
       )}
 
       {gameStarted && isMobile && (
-        <div className="absolute inset-0 z-[200] pointer-events-none">
-          {/* Vänsterstyrning: Vänster/Höger pilar */}
-          <div className="absolute bottom-8 left-4 flex gap-3 pointer-events-auto">
+        <div className="absolute inset-0 z-[200] pointer-events-none overflow-hidden">
+          {/* Vänsterstyrning: Vänster/Höger pilar - Flyttade upp lite för att undvika system-gester */}
+          <div className="absolute bottom-10 left-4 flex gap-2 pointer-events-auto">
             <button 
                 onPointerDown={(e)=>{ e.preventDefault(); touch.current.left=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.left=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.left=false; }}
                 style={{width:'80px',height:'80px'}}
@@ -935,31 +992,31 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
             >→</button>
           </div>
 
-          {/* Högerstyrning: Eld/Hopp/Spin */}
-          <div className="absolute bottom-8 right-4 flex flex-col items-end gap-3 pointer-events-auto">
+          {/* Högerstyrning: Eld/Hopp/Spin - Flyttade isär för att undvika överlapp i portrait */}
+          <div className="absolute bottom-10 right-4 flex flex-col items-end gap-2 pointer-events-auto">
             {/* SPIN – visas tydligt när energi är full */}
             <button 
                 onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }} 
-                style={{width:'64px',height:'64px'}}
-                className={`rounded-full border-2 font-black transition-all select-none text-xs tracking-widest ${
+                style={{width:'56px',height:'56px'}}
+                className={`rounded-full border-2 font-black transition-all select-none text-[10px] tracking-widest ${
                   spinEnergy >= 100 
                     ? 'bg-yellow-400/70 text-black border-yellow-300 animate-pulse shadow-[0_0_20px_rgba(250,204,21,0.8)]' 
                     : 'bg-white/5 text-white/30 border-white/10'
                 }`}
             >SPIN</button>
             
-            <div className="flex gap-4 items-end">
+            <div className="flex gap-2 items-end">
                 {/* ELD/SKJUT-knapp – stor och tydlig */}
                 <button 
                     onPointerDown={(e)=>{ e.preventDefault(); touch.current.fire=true; }}
-                    style={{width:'80px',height:'80px'}}
-                    className="bg-red-600/50 backdrop-blur-md rounded-full font-black text-3xl shadow-2xl border-3 border-red-400/60 active:bg-red-500/80 text-white flex items-center justify-center"
+                    style={{width:'74px',height:'74px'}}
+                    className="bg-red-600/50 backdrop-blur-md rounded-full font-black text-2xl shadow-2xl border-2 border-red-400/60 active:bg-red-500/80 text-white flex items-center justify-center"
                 >🔥</button>
                 {/* HOPP-knapp */}
                 <button 
                     onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
-                    style={{width:'96px',height:'96px'}}
-                    className="bg-blue-600/50 backdrop-blur-md rounded-full font-black text-xl shadow-2xl border-2 border-blue-400/60 active:bg-blue-500/80 text-white flex items-center justify-center uppercase tracking-widest"
+                    style={{width:'84px',height:'84px'}}
+                    className="bg-blue-600/50 backdrop-blur-md rounded-full font-black text-sm shadow-2xl border-2 border-blue-400/60 active:bg-blue-500/80 text-white flex items-center justify-center uppercase tracking-widest"
                 >HOPP</button>
             </div>
           </div>
