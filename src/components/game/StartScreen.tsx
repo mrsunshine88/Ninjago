@@ -16,9 +16,11 @@ const ICONS: Record<string, any> = {
 interface StartScreenProps {
   onStart: (name: string, ninja: Ninja) => void;
   scores: ScoreEntry[];
+  isMuted: boolean;
+  onToggleMute: () => void;
 }
 
-export function StartScreen({ onStart, scores }: StartScreenProps) {
+export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScreenProps) {
   const [name, setName] = useState("");
   const [selectedNinja, setSelectedNinja] = useState<Ninja | null>(null);
   const [hoveredNinja, setHoveredNinja] = useState<Ninja | null>(null);
@@ -53,12 +55,46 @@ export function StartScreen({ onStart, scores }: StartScreenProps) {
   };
 
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const menuMusicRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     window.addEventListener("beforeinstallprompt", (e) => {
       e.preventDefault();
       setInstallPrompt(e);
     });
+
+    // Skapa musikobjektet endast en gång
+    if (!menuMusicRef.current) {
+        menuMusicRef.current = new Audio('/audio/lucadialessandro-arcade-melody-295434.mp3');
+        menuMusicRef.current.loop = true;
+    }
+    
+    // Uppdatera volym baserat på isMuted direkt
+    menuMusicRef.current.volume = isMuted ? 0 : 0.4;
+    
+    // Försök spela
+    const playAttempt = menuMusicRef.current.play();
+    if (playAttempt !== undefined) {
+      playAttempt.catch(() => {
+        // Ignorera autoplay-fel
+      });
+    }
+    
+    return () => {
+      // Vi behåller ref men pausar om komponenten avmonteras helt
+      // (Fast här växlar vi bara props, så vi pausar inte nödvändigtvis)
+    };
+  }, [isMuted]);
+
+  // Stäng av musiken helt när vi lämnar startskärmen
+  useEffect(() => {
+    return () => {
+        if (menuMusicRef.current) {
+            menuMusicRef.current.pause();
+            menuMusicRef.current.src = "";
+            menuMusicRef.current = null;
+        }
+    };
   }, []);
 
   const handleInstall = async () => {
@@ -80,6 +116,20 @@ export function StartScreen({ onStart, scores }: StartScreenProps) {
         </button>
       )}
 
+      {/* Mute Toggle Button */}
+      <button 
+        onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
+        onPointerDown={(e) => { e.stopPropagation(); }}
+        className="absolute top-6 right-6 p-4 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl z-50 transition-all active:scale-95 group"
+        title={isMuted ? "Slå på ljud" : "Stäng av ljud"}
+      >
+        {isMuted ? (
+          <VolumeX className="w-8 h-8 text-red-500 animate-pulse" />
+        ) : (
+          <Volume2 className="w-8 h-8 text-green-500 group-hover:scale-110 transition-transform" />
+        )}
+      </button>
+
       {/* Bakgrund */}
       <div 
         className={`absolute inset-0 bg-gradient-to-br from-black via-[#1a140f] to-black transition-all duration-1000 -z-20 ${hoveredNinja ? 'opacity-40 blur-sm scale-110' : 'opacity-100'}`}
@@ -93,7 +143,7 @@ export function StartScreen({ onStart, scores }: StartScreenProps) {
         onClick={handleLogoClick}
       >
         <div className="inline-block p-1 bg-white/10 rounded-full mb-2 backdrop-blur-md border border-white/20 shadow-2xl overflow-hidden">
-          <img src="/LNERI2019.jpg" alt="Ninjago" className="w-32 h-32 object-cover rounded-full" />
+          <img src="/icon.png" alt="Ninjago" className="w-32 h-32 object-cover rounded-full" />
         </div>
         <h1 className="text-6xl md:text-8xl font-black tracking-tighter uppercase italic high-score-text drop-shadow-[0_5px_15px_rgba(0,0,0,0.8)]">
           Ninjago
@@ -181,9 +231,14 @@ export function StartScreen({ onStart, scores }: StartScreenProps) {
         </div>
       </div>
 
-      {/* Credit Text - Mer kompakt på mobil för att undvika överlapp */}
+      {/* Version Tag - Bottom Left (Now bigger and clearer) v1.37 */}
+      <div className="absolute bottom-4 left-6 text-white/60 text-[14px] font-black uppercase tracking-[0.2em] z-50 pointer-events-none select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] italic">
+        v1.37
+      </div>
+
+      {/* Credit Text - Placeras under allt på mobil, nere i hörnet på desktop */}
       <div 
-        className={`absolute bottom-5 ${isAdminMode ? 'right-5' : 'left-1/2 -translate-x-1/2 lg:left-auto lg:translate-x-0 lg:right-5'} text-[#FFD700] text-[12px] md:text-[16px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] z-50 pointer-events-none select-none text-center whitespace-nowrap`}
+        className={`mt-8 lg:mt-0 lg:absolute lg:bottom-5 ${isAdminMode ? 'lg:right-5' : 'lg:right-5'} text-[#FFD700] text-[12px] md:text-[16px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] z-50 pointer-events-none select-none text-center whitespace-nowrap`}
       >
         Game Idea & Design by Lukas Persson
       </div>

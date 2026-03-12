@@ -4,18 +4,33 @@ import { Ninja, Level } from "@/lib/game-data";
 import { GameEngine } from "./GameEngine";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Sword, Zap, Heart, LogOut } from "lucide-react";
+import { Sword, Zap, Heart, LogOut, Volume2, VolumeX } from "lucide-react";
 
 interface BattleViewProps {
   ninja: Ninja;
   level: Level;
   playerName: string;
+  initialScore: number;
+  retryCount?: number;
+  isMuted: boolean;
+  onToggleMute: () => void;
   onNext: (pointsGained: number) => void;
   onGameOver?: (score: number) => void;
   onAbort?: () => void;
 }
 
-export function BattleView({ ninja, level, playerName, onNext, onGameOver, onAbort }: BattleViewProps) {
+export function BattleView({ 
+  ninja, 
+  level, 
+  playerName, 
+  initialScore, 
+  retryCount = 0, 
+  isMuted,
+  onToggleMute,
+  onNext, 
+  onGameOver, 
+  onAbort 
+}: BattleViewProps) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 md:p-6 gap-4 animate-in fade-in duration-500 max-w-6xl mx-auto w-full">
       <div className="w-full flex justify-between items-center bg-card/60 p-4 rounded-xl border border-primary/30 backdrop-blur-xl shadow-2xl">
@@ -39,14 +54,26 @@ export function BattleView({ ninja, level, playerName, onNext, onGameOver, onAbo
             </span>
           </div>
           
-          <Button 
-            variant="destructive" 
-            onClick={onAbort} 
-            className="bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest px-6 h-12 rounded-xl border-b-4 border-red-800 active:border-0 active:translate-y-1 transition-all flex items-center gap-2"
-          >
-            <LogOut className="w-5 h-5" />
-            AVSLUTA
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+                variant="outline" 
+                onClick={(e) => { e.stopPropagation(); onToggleMute(); }} 
+                onPointerDown={(e) => { e.stopPropagation(); }}
+                className="bg-white/10 hover:bg-white/20 text-white border-white/20 h-12 w-12 rounded-xl active:scale-95 transition-all p-0 flex items-center justify-center"
+                title={isMuted ? "Slå på ljud" : "Stäng av ljud"}
+            >
+                {isMuted ? <VolumeX className="w-6 h-6 text-red-500" /> : <Volume2 className="w-6 h-6 text-green-500" />}
+            </Button>
+
+            <Button 
+                variant="destructive" 
+                onClick={onAbort} 
+                className="bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest px-6 h-12 rounded-xl border-b-4 border-red-800 active:border-0 active:translate-y-1 transition-all flex items-center gap-2"
+            >
+                <LogOut className="w-5 h-5" />
+                AVSLUTA
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -54,9 +81,12 @@ export function BattleView({ ninja, level, playerName, onNext, onGameOver, onAbo
 
       <div className="relative w-full aspect-video md:aspect-[16/9] max-h-[70vh] shadow-[0_0_50px_rgba(0,0,0,0.5)]">
         <GameEngine 
+          key={`${level.number}-${ninja.id}-${retryCount}`}
           ninja={ninja}
           level={level}
           playerName={playerName}
+          initialScore={initialScore}
+          isMuted={isMuted}
           onLevelComplete={(points) => onNext(points)}
           onGameOver={(finalScore) => onGameOver?.(finalScore)}
         />

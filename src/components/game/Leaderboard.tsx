@@ -50,7 +50,7 @@ export function Leaderboard({ scores }: LeaderboardProps) {
                     </div>
                   </td>
                   <td className="px-4 py-3 font-mono font-bold text-primary">
-                    {entry.score.toLocaleString()}
+                    {(entry.score || 0).toLocaleString()}
                   </td>
                 </tr>
               ))}

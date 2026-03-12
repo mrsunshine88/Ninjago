@@ -30,7 +30,6 @@ export interface Level {
   bgColor: string;
   platformColor: string;
   atmosphereType?: 'dust' | 'snow' | 'embers' | 'rain' | 'void';
-  hazardType?: 'lava' | 'ice' | 'none';
   difficulty: 1 | 2 | 3 | 4 | 5 | 6;
   bossPoints: number;
   timeLimit: number;
@@ -76,7 +75,6 @@ export const LEVELS: Level[] = [
     bgColor: '#051122',
     platformColor: '#1e3a8a',
     atmosphereType: 'snow',
-    hazardType: 'ice',
     difficulty: 2,
     bossPoints: 4000,
     timeLimit: 240,
@@ -99,7 +97,6 @@ export const LEVELS: Level[] = [
     bgColor: '#330000',
     platformColor: '#7f1d1d',
     atmosphereType: 'embers',
-    hazardType: 'lava',
     difficulty: 3,
     bossPoints: 6000,
     timeLimit: 400,

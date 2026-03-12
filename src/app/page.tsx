@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Ninja, Level, LEVELS } from "@/lib/game-data";
 import { getLeaderboard, saveScore, ScoreEntry } from "@/lib/leaderboard";
 import { StartScreen } from "@/components/game/StartScreen";
@@ -16,62 +16,96 @@ export default function NinjagoGame() {
   const [selectedNinja, setSelectedNinja] = useState<Ninja | null>(null);
   const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
   const [score, setScore] = useState(0);
-  const [isHighScore, setIsHighScore] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [gameOverData, setGameOverData] = useState<{ score: number, isHighScore: boolean } | null>(null);
   const [leaderboard, setLeaderboard] = useState<ScoreEntry[]>([]);
+  const [isMuted, setIsMuted] = useState(false);
 
-  // Load leaderboard on mount
+  // Load leaderboard and settings on mount
   useEffect(() => {
     setLeaderboard(getLeaderboard());
+    const savedMute = localStorage.getItem('ninjago_muted') === 'true';
+    setIsMuted(savedMute);
   }, []);
 
-  const handleStart = (name: string, ninja: Ninja) => {
-    setPlayerName(name);
-    setSelectedNinja(ninja);
-    setScore(0);
-    setCurrentLevelIdx(0);
-    setGameState('playing');
-  };
+  const toggleMute = useCallback(() => {
+    setIsMuted(prev => {
+      const newVal = !prev;
+      localStorage.setItem('ninjago_muted', String(newVal));
+      return newVal;
+    });
+  }, []);
 
-  const handleLevelComplete = (pointsGained: number) => {
-    const newScore = score + pointsGained;
-    setScore(newScore);
 
-    if (currentLevelIdx < LEVELS.length - 1) {
-      setCurrentLevelIdx(prev => prev + 1);
-    } else {
-      finishGame(newScore);
-    }
-  };
-
-  const handleGameOver = (finalScore: number) => {
-    finishGame(score + finalScore);
-  };
-
-  const finishGame = (finalScore: number) => {
+  const finishGame = useCallback((total: number) => {
     const result = saveScore({
       name: playerName,
-      score: finalScore,
+      score: total,
       ninja: selectedNinja?.name || "Okänd",
       date: new Date().toISOString()
     });
-    setIsHighScore(result.isHighScore);
+    setGameOverData({ score: total, isHighScore: result.isHighScore });
     setLeaderboard(getLeaderboard());
     setGameState('gameover');
-  };
+  }, [playerName, selectedNinja]);
 
-  const handleReset = () => {
-    setGameState('menu');
-  };
+  const handleStart = useCallback((name: string, ninja: Ninja) => {
+    setPlayerName(name);
+    setSelectedNinja(ninja);
+    setScore(0);
+    setGameOverData(null);
+    setCurrentLevelIdx(0);
+    setGameState('playing');
+  }, []);
 
-  const handleAbort = () => {
-    // Direkt återgång till menyn utan confirm-ruta för att garantera att det funkar
+  const handleLevelComplete = useCallback((pointsGained: number) => {
+    // GameEngine returnerar nu det totala värdet (initialScore + levelPoints)
+    // Så vi sätter bara poängen direkt.
+    setScore(pointsGained);
+    
+    if (currentLevelIdx < LEVELS.length - 1) {
+      setCurrentLevelIdx(idx => idx + 1);
+    } else {
+      setTimeout(() => finishGame(pointsGained), 10);
+    }
+  }, [currentLevelIdx, finishGame]);
+
+  const handleGameOver = useCallback((totalScore: number) => {
+    setScore(totalScore);
+    setTimeout(() => finishGame(totalScore), 10);
+  }, [finishGame]);
+
+  const handleRetry = useCallback(() => {
     setGameState('menu');
-  };
+    setScore(0);
+    setGameOverData(null);
+    setCurrentLevelIdx(0);
+    
+    setTimeout(() => {
+      setRetryCount(prev => prev + 1);
+      setGameState('playing');
+    }, 50);
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setScore(0);
+    setRetryCount(0);
+    setGameState('menu');
+  }, []);
+
+  const handleAbort = useCallback(() => {
+    setGameState('menu');
+  }, []);
 
   return (
     <main className="min-h-screen">
       {gameState === 'menu' && (
-        <StartScreen onStart={handleStart} scores={leaderboard} />
+        <StartScreen 
+          onStart={handleStart} 
+          scores={leaderboard} 
+          isMuted={isMuted}
+          onToggleMute={toggleMute}
+        />
       )}
       
       {gameState === 'playing' && selectedNinja && (
@@ -79,18 +113,24 @@ export default function NinjagoGame() {
           ninja={selectedNinja} 
           level={LEVELS[currentLevelIdx]} 
           playerName={playerName}
+          initialScore={score}
+          retryCount={retryCount}
+          isMuted={isMuted}
+          onToggleMute={toggleMute}
           onNext={handleLevelComplete}
           onGameOver={handleGameOver}
           onAbort={handleAbort}
         />
       )}
 
-      {gameState === 'gameover' && (
+      {gameState === 'gameover' && gameOverData && (
         <GameOverView 
           playerName={playerName} 
-          finalScore={score} 
-          isHighScore={isHighScore} 
-          onReset={handleReset} 
+          finalScore={gameOverData.score} 
+          isHighScore={gameOverData.isHighScore} 
+          isMuted={isMuted}
+          onReset={handleReset}
+          onRetry={handleRetry} 
         />
       )}
     </main>

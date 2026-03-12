@@ -20,15 +20,22 @@ export function getLeaderboard(): ScoreEntry[] {
 }
 
 export function saveScore(entry: ScoreEntry): { isHighScore: boolean } {
-  if (entry.score <= 200) return { isHighScore: false };
+  // Validera poäng
+  if (entry.score === null || entry.score === undefined || isNaN(entry.score)) {
+    entry.score = 0;
+  }
+  
   const current = getLeaderboard();
+  
+  // Beräkna om detta är ett high score (bättre än nuvarande #1)
+  const isHighScore = current.length === 0 || entry.score > current[0].score;
+
   const updated = [...current, entry]
     .sort((a, b) => b.score - a.score)
     .slice(0, 15);
-  
   localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(updated));
   
-  // High score check: if this entry is the top one globally
-  const isHighScore = updated.length > 0 && updated[0].score === entry.score;
-  return { isHighScore };
+  // Returnera om det är det absoluta rekordet på topplistan
+  const isTopOne = updated.length > 0 && updated[0].score === entry.score;
+  return { isHighScore: isTopOne };
 }

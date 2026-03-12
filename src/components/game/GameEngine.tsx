@@ -14,26 +14,46 @@ interface GameEngineProps {
   ninja: Ninja;
   level: Level;
   playerName: string;
+  initialScore: number;
+  isMuted: boolean;
   onGameOver: (score: number) => void;
   onLevelComplete: (points: number) => void;
 }
 
-export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComplete }: GameEngineProps) {
+export function GameEngine({ ninja, level, playerName, initialScore, isMuted, onGameOver, onLevelComplete }: GameEngineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
-  const [currentScore, setCurrentScore] = useState(0);
+  const [showLevelIntro, setShowLevelIntro] = useState(false);
+  const cleanedImages = useRef<Record<string, HTMLCanvasElement>>({});
+  const [currentScore, setCurrentScore] = useState(initialScore);
   const [spinEnergy, setSpinEnergy] = useState(0);
   const [displayTime, setDisplayTime] = useState(0);
+
+  // Använd refs för att undvika stale closures i loopen
+  const onGameOverRef = useRef(onGameOver);
+  const onLevelCompleteRef = useRef(onLevelComplete);
+  const isMutedRef = useRef(isMuted);
+
+  useEffect(() => {
+    onGameOverRef.current = onGameOver;
+    onLevelCompleteRef.current = onLevelComplete;
+    isMutedRef.current = isMuted;
+
+    // Uppdatera volym på bakgrundsmusik direkt
+    if (audioRef.current) {
+        audioRef.current.volume = isMuted ? 0 : 0.4;
+    }
+  }, [onGameOver, onLevelComplete, isMuted]);
   const [highScore, setHighScore] = useState(0);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   
   const state = useRef({
     started: false,
     active: true,
-    score: 0,
+    score: initialScore,
     energy: 0,
     cameraX: 0,
     timeLeft: 0,
@@ -44,9 +64,9 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
     projs: [] as any[],
     bossProjs: [] as any[],
     plats: [] as any[],
-    hazards: [] as any[],
     particles: [] as Particle[],
-    boss: { hp: 1, max: 1, active: false, x: 0, y: 0, w: 0, h: 0, img: '', attackCd: 0 },
+    boss: { hp: 1, max: 1, active: false, x: 0, y: 0, w: 0, h: 0, img: '', attackCd: 0, hitT: 0 },
+    shake: 0,
     initDone: false
   });
 
@@ -60,12 +80,28 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
     'lila svart monster.png', 'lila svart stor orm.png', 'stor drake.png', 'storm arg orm.png'
   ];
 
+  const playSFX = (file: string, vol = 0.4) => {
+    if (isMutedRef.current) return;
+    const audio = new Audio(`/audio/${file}`);
+    audio.volume = vol;
+    audio.play().catch(() => {});
+  };
+
   useEffect(() => {
     setIsMobile(window.innerWidth < 1024);
     
-    // Reset initialization when level or ninja changes
     state.current.initDone = false;
-
+    setGameStarted(false);
+    setShowLevelIntro(true); // Visa nivå-introduktion
+    
+    // Visa nivå-introduktion i 3 sekunder, starta sedan (eller visa startknapp)
+    const timer = setTimeout(() => {
+        setShowLevelIntro(false);
+        if (level.number > 1) {
+            setGameStarted(true);
+        }
+    }, 3000);
+    
     const handleInstallPrompt = (e: any) => {
         e.preventDefault();
         setDeferredPrompt(e);
@@ -78,7 +114,7 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         state.current.highScore = lb[0].score;
     }
 
-    const heroFiles = ['kai.png', 'Jay.png', 'zane.png', 'Cole.png', 'Lloyd.png', 'Nya.png', 'overlord.png'];
+    const heroFiles = ['kai.png', 'Jay.png', 'zane.png', 'Cole.png', 'Lloyd.png', 'Nya.png'];
     heroFiles.forEach(f => {
       const img = new Image();
       img.src = `/${f}`;
@@ -104,12 +140,17 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
             if (v) state.current.jumpReq = true;
         }
     };
-    window.addEventListener('keydown', (e) => handleKey(e, true));
-    window.addEventListener('keyup', (e) => handleKey(e, false));
+
+    const kd = (e: KeyboardEvent) => handleKey(e, true);
+    const ku = (e: KeyboardEvent) => handleKey(e, false);
+    window.addEventListener('keydown', kd);
+    window.addEventListener('keyup', ku);
 
     return () => { 
+        clearTimeout(timer);
         state.current.active = false; 
-        window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
+        window.removeEventListener('keydown', kd);
+        window.removeEventListener('keyup', ku);
         if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     };
   }, [level, ninja]);
@@ -117,6 +158,7 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
   const handleStartGame = async () => {
     state.current.started = true;
     setGameStarted(true);
+    playSFX('lolo_s-start-474092.mp3', 0.8);
     
     if (isMobile && containerRef.current) {
       const container = containerRef.current;
@@ -152,16 +194,18 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         platforms.push({ x: 0, y: 560, w: len, h: 200 }); 
         
         let curX = 1200;
-        while (curX < len - 1000) { // Förläng plattformar ända fram till bossområdet
-            const h = 300 + Math.random() * 200;
+        while (curX < len - 1000) { 
+            // Höjd (y-position): 150 till 350 för att garantera spelrum under plattformen (marken är på 560)
+            const h = 150 + Math.random() * 200; 
             const w = 400 + Math.random() * 800;
             platforms.push({ x: curX, y: h, w, h: 40 }); 
-            if (Math.random() > 0.5) platforms.push({ x: curX - 100, y: 500, w: 100, h: 60 });
+            if (Math.random() > 0.5) platforms.push({ x: curX - 100, y: 480, w: 100, h: 60 });
             curX += w + 200 + Math.random() * 400;
         }
         
-        // Garantera en arena-plattform vid bossen
-        platforms.push({ x: len - 1500, y: 500, w: 1500, h: 100 });
+        // Garantera en arena-plattform vid bossen som spelaren faktiskt ser
+        platforms.push({ x: len - 1800, y: 560, w: 1800, h: 200 }); // Förläng marken i slutet
+        platforms.push({ x: len - 1500, y: 450, w: 1000, h: 50 });  // Extra plattform hos bossen
         
         state.current.plats = platforms;
         
@@ -170,13 +214,13 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         platforms.forEach((p, i) => {
             if (i === 0 || p.w < 200) return;
             
-            // Fler fiender och högre chans på högre svårighetsgrader
-            const maxE = Math.min(3, 1 + Math.floor(level.difficulty / 2));
-            const count = Math.floor(Math.random() * maxE) + 1;
+            // Fler fiender och högre chans på alla nivåer
+            const maxE = Math.min(5, 2 + Math.floor(level.difficulty));
+            const count = Math.floor(Math.random() * maxE) + 2; 
             
             for (let j = 0; j < count; j++) {
-                // Tröskeln minskar med svårighetsgraden (lägre tröskel = fler fiender)
-                const spawnThreshold = 0.6 - (level.difficulty * 0.08); 
+                // Lägre tröskel = fler fiender som faktiskt spawnar
+                const spawnThreshold = 0.35 - (level.difficulty * 0.05); 
                 if (Math.random() > spawnThreshold) {
                     const offset = (p.w / (count + 1)) * (j + 1);
                     const enemyX = p.x + offset;
@@ -186,16 +230,32 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
                         y: p.y - 140, 
                         w: 120, 
                         h: 140, 
-                        dx: (level.number === 1 ? -1.2 : -1.8 - (level.difficulty * 0.2)), 
+                        dx: (level.number === 1 ? -1.5 : -2.2 - (level.difficulty * 0.3)), 
                         dy: 0, 
                         img: mFile.toLowerCase(), 
                         origX: enemyX, 
-                        range: p.w / count, 
+                        range: p.w / (count > 1 ? 1.5 : 1), 
                         onG: true 
                     });
                 }
             }
         });
+
+        // Extra procedurfiender på markplan för mer action (mellan x=1500 och bossen)
+        for (let gx = 1500; gx < len - 3000; gx += (800 + Math.random() * 1200)) {
+            const mFile = monsterFiles[Math.floor(Math.random() * monsterFiles.length)];
+            enemies.push({
+                x: gx, 
+                y: 420, // Marknivå (560 - 140)
+                w: 120, h: 140,
+                dx: -2.5 - Math.random() * 2, 
+                dy: 0,
+                img: mFile.toLowerCase(),
+                origX: gx, 
+                range: 400 + Math.random() * 800,
+                onG: true
+            });
+        }
         state.current.enemies = enemies;
 
         let bossImg = 'overlord.png';
@@ -206,9 +266,13 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         else if (level.number === 5) bossImg = 'lila svart monster.png';
         else if (level.number === 6 && !images.current['overlord']) bossImg = 'fiender ond.png'; // Fallback om bilden saknas
 
-        // Bossens HP: Skalar upp men med ett tak på 150 för att det inte ska bli segt
-        const bossHP = Math.min(150, (level.boss?.healthMultiplier || 1) * 15);
-        state.current.boss = { x: len - 1200, y: 150, w: 420, h: 480, hp: bossHP, max: bossHP, active: false, img: bossImg.toLowerCase(), attackCd: 120 };
+        // Om overlord.png saknas (vi har tagit bort den från heroFiles för att undvika 404), använd fallback
+        if (level.number === 6) bossImg = 'fiender ond.png';
+
+        // Bossens HP: Buffad så de inte dör på ett skott. Bas-HP 45 istället för 15.
+        const bossHP = Math.min(300, (level.boss?.healthMultiplier || 1) * 45);
+        // Flytta bossen till len - 800 så den hamnar mitt i sista vyn
+        state.current.boss = { x: len - 800, y: 100, w: 500, h: 500, hp: bossHP, max: bossHP, active: false, img: bossImg.toLowerCase(), attackCd: 120, hitT: 0 };
         state.current.timeLeft = level?.timeLimit || 120;
         state.current.initDone = true;
     }
@@ -217,8 +281,9 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
   useEffect(() => {
     if (!gameStarted || !state.current.active) return;
     if (!audioRef.current) {
-        const audio = new Audio('/audio/ninjago_menu_music_8bit.wav');
-        audio.loop = true; audio.volume = 0.5; audio.play().catch(() => {});
+        // Starta med stridsmusik när banan börjar
+        const audio = new Audio('/audio/ninjago_battle_music_8bit.wav');
+        audio.loop = true; audio.volume = isMutedRef.current ? 0 : 0.4; audio.play().catch(() => {});
         audioRef.current = audio;
     }
 
@@ -236,7 +301,7 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         frames++;
         const s = state.current;
         const now = Date.now();
-        if (now - lastTime >= 1000) { s.timeLeft = Math.max(0, s.timeLeft - 1); lastTime = now; if (s.timeLeft <= 0) { s.active = false; onGameOver(s.score); } }
+        if (now - lastTime >= 1000) { s.timeLeft = Math.max(0, s.timeLeft - 1); lastTime = now; if (s.timeLeft <= 0) { s.active = false; onGameOverRef.current(s.score); } }
 
         ctx.fillStyle = level.bgColor || '#1a140f';
         ctx.fillRect(0, 0, 800, 600);
@@ -248,25 +313,67 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
 
         const mL = keys.current['ArrowLeft'] || touch.current.left;
         const mR = keys.current['ArrowRight'] || touch.current.right;
+        const oldX = s.x;
+        const oldY = s.y;
+        
         if (mL) { s.dx = Math.max(s.dx - 1.2, -11); s.fR = false; }
         if (mR) { s.dx = Math.min(s.dx + 1.2, 11); s.fR = true; }
-        s.dx *= 0.88; s.dy += 0.8; s.x += s.dx; s.y += s.dy;
 
+        // 1. Horisontell rörelse och kollision
+        s.dx *= 0.88;
+        s.x += s.dx;
+        
         let onGround = false;
-        const hbP = 30;
+        const hbP = 25; // Hitbox padding (ninjan är 140 bred)
+        const ninjaW = 140;
+        const ninjaH = 160;
+
         s.plats.forEach(plat => {
-            if (s.x + hbP < plat.x + plat.w && s.x + 140 - hbP > plat.x) {
-                // Ground collision
-                if (s.y + 160 > plat.y && s.y + 160 < plat.y + 60 + Math.max(0, s.dy)) { 
-                    s.y = plat.y - 160; 
+            // Kolla om vi är i samma höjdspann som plattformen (för väggkollision)
+            if (s.y + ninjaH > plat.y + 10 && s.y < plat.y + plat.h - 10) {
+                // Vänster vägg på plattformen
+                if (oldX + ninjaW - hbP <= plat.x && s.x + ninjaW - hbP > plat.x) {
+                    s.x = plat.x - (ninjaW - hbP);
+                    s.dx = 0;
+                }
+                // Höger vägg på plattformen
+                else if (oldX + hbP >= plat.x + plat.w && s.x + hbP < plat.x + plat.w) {
+                    s.x = plat.x + plat.w - hbP;
+                    s.dx = 0;
+                }
+            }
+        });
+
+        // 2. Vertikal rörelse och kollision
+        s.dy += 0.8;
+        s.y += s.dy;
+        const newY = s.y;
+
+        s.plats.forEach(plat => {
+            // Kolla om vi är inom plattformens bredd (för mark/tak-kollision)
+            if (s.x + hbP < plat.x + plat.w && s.x + ninjaW - hbP > plat.x) {
+                const playerFeetOld = oldY + ninjaH;
+                const playerFeetNew = newY + ninjaH;
+                
+                // Mark-kollision
+                if (s.dy >= 0 && playerFeetOld <= plat.y + 5 && playerFeetNew >= plat.y) {
+                    if (s.dy > 5) {
+                        s.shake = s.dy * 0.5;
+                        for(let k=0; k<8; k++) s.particles.push({ 
+                            x: s.x + 70, y: plat.y, 
+                            dx: (Math.random()-0.5)*10, dy: -Math.random()*5, 
+                            life: 25, size: 4, color: level.platformColor || '#555', type: 'spark' 
+                        });
+                    }
+                    s.y = plat.y - ninjaH; 
                     s.dy = 0; 
                     s.jump = false; 
                     onGround = true; 
                 }
-                // Ceiling collision: Om du hoppar upp i en plattform
+                // Tak-kollision
                 else if (s.dy < 0 && s.y > plat.y + plat.h - 20 && s.y < plat.y + plat.h + 20) {
                     s.y = plat.y + plat.h + 2;
-                    s.dy = 0.5; // Stoppa uppåtfarten och börja falla
+                    s.dy = 0.5;
                 }
             }
         });
@@ -279,8 +386,19 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         s.cameraX = Math.max(0, Math.min(s.x - 300, level.length - 800));
         s.energy = Math.min(100, s.energy + 0.2); 
         
-        if ((keys.current['KeyX'] || touch.current.fire) && !s.spin) { s.projs.push({ x: s.fR?s.x+110:s.x+30, y: s.y+80, dx: s.fR?22:-22, c: ninja.color });  touch.current.fire = false; }
-        if (touch.current.spin && s.energy >= 100) { s.spin = true; s.spinT = 150; s.energy = 0; touch.current.spin = false; }
+        if ((keys.current['KeyX'] || touch.current.fire) && !s.spin) { 
+            s.projs.push({ x: s.fR?s.x+110:s.x+30, y: s.y+80, dx: s.fR?22:-22, c: ninja.color });  
+            touch.current.fire = false; 
+            
+            // Olika ljud för olika ninjor
+            let shotSFX = 'sfx_lightning_8bit.wav';
+            if (ninja.id === 'kai') shotSFX = 'sfx_sword_hit_8bit.wav';
+            else if (ninja.id === 'cole') shotSFX = 'sfx_sword_hit_8bit.wav';
+            else if (ninja.id === 'zane') shotSFX = 'sfx_lightning_8bit.wav';
+            
+            playSFX(shotSFX); 
+        }
+        if (touch.current.spin && s.energy >= 100) { s.spin = true; s.spinT = 150; s.energy = 0; touch.current.spin = false; playSFX('sfx_spinjitzu_8bit.wav'); }
         if (s.spin) { s.spinT--; s.dx = s.fR ? 17 : -17; if(frames%2===0) s.particles.push({ x: s.x+70+Math.cos(frames*0.5)*100, y: s.y+80+Math.sin(frames*0.5)*100, dx: 0, dy: 0, life: 30, size: 5, color: ninja.color, type: 'vortex' }); if(s.spinT <= 0) s.spin = false; }
 
         if (frames % 4 === 0) {
@@ -291,9 +409,14 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         }
 
         ctx.save(); ctx.translate(-s.cameraX, 0);
+        // Optimering: Begränsa antalet partiklar för att förhindra lagg på mobila enheter
+        if (s.particles.length > 30) s.particles.splice(0, s.particles.length - 30);
+        
         s.particles.forEach((p, i) => {
             p.x += p.dx; p.y += p.dy; p.life--;
             if (p.life <= 0) { s.particles.splice(i, 1); return; }
+            // Optimering: Rita bara partiklar som syns på skärmen
+            if (p.x < s.cameraX - 100 || p.x > s.cameraX + 900) return;
             ctx.fillStyle = p.color;
             if (p.type === 'vortex') { ctx.shadowBlur = 10; ctx.shadowColor = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0; }
             else ctx.fillRect(p.x, p.y, p.size, p.size);
@@ -306,7 +429,8 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
             ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(plat.x, plat.y, plat.w, 4);
         });
 
-        s.enemies.forEach((e, i) => {
+        for (let i = s.enemies.length - 1; i >= 0; i--) {
+            const e = s.enemies[i];
             e.dy += 0.8; e.y += e.dy;
             s.plats.forEach(plat => {
                 if (e.x + 10 < plat.x + plat.w && e.x + e.w - 10 > plat.x) {
@@ -314,35 +438,147 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
                 }
             });
             const dist = (s.x + 70) - (e.x + 50);
-            if (Math.abs(dist) < 600 && Math.abs(s.y - e.y) < 300) { e.dx = dist > 0 ? 3.4 : -3.4; e.x += e.dx; }
+            const distY = s.y - e.y;
+            
+            if (Math.abs(dist) < 700 && Math.abs(distY) < 500) { 
+                // Kolla om fienden är på en plattform (och inte på marken)
+                let currentPlat = null;
+                for (const p of s.plats) {
+                    if (e.x + 10 < p.x + p.w && e.x + e.w - 10 > p.x && Math.abs(e.y + e.h - p.y) < 10) {
+                        currentPlat = p;
+                        break;
+                    }
+                }
+
+                // Förbättrad AI-hopp logik (v1.37: Visibility Trim)
+                const isUnder = distY > 40;
+                // Skärmbredden är 800, så vi kräver att de är inom [cameraX + 50, cameraX + 750]
+                const isVisible = e.x > s.cameraX + 50 && e.x < s.cameraX + 750;
+                
+                // Om vi redan är i jumpMode, fortsätt tills vi lämnat plattformen
+                if (e.jumpMode) {
+                    e.dx = e.jumpMode === 'left' ? -7.5 : 7.5;
+                    
+                    if (currentPlat) {
+                        const toLeftEdge = e.x - currentPlat.x;
+                        const toRightEdge = (currentPlat.x + currentPlat.w) - (e.x + e.w);
+                        
+                        if (toLeftEdge < 50 && e.jumpMode === 'left') { 
+                            e.x -= 80; // Knuffa ut ordentligt
+                            e.jumpMode = null; 
+                        }
+                        else if (toRightEdge < 50 && e.jumpMode === 'right') { 
+                            e.x += 80;
+                            e.jumpMode = null; 
+                        }
+                    } else {
+                        e.jumpMode = null; // Vi faller redan
+                    }
+                } 
+                else if (isUnder && currentPlat && isVisible) {
+                    // Starta hoppet och håll kvar det! ENDAST OM SYNLIG!
+                    e.jumpMode = dist < 0 ? 'left' : 'right';
+                    e.dx = e.jumpMode === 'left' ? -7.5 : 7.5;
+                }
+                else {
+                    e.jumpMode = null; 
+                    e.dx = dist > 0 ? 4.5 : -4.5; 
+                    if (distY < -120 && e.dy === 0) { e.dy = -15; e.y -= 5; }
+                }
+                e.x += e.dx; 
+            }
             else { e.x += e.dx; if (e.x < e.origX || e.x > e.origX + e.range) e.dx *= -1; }
             
             const mImg = images.current[e.img];
             if (mImg?.complete && mImg.naturalWidth > 0) {
+                if (!cleanedImages.current[e.img]) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = mImg.naturalWidth; canvas.height = mImg.naturalHeight;
+                    const tempCtx = canvas.getContext('2d');
+                    if (tempCtx) {
+                        tempCtx.drawImage(mImg, 0, 0);
+                        const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
+                        const data = imageData.data;
+                        for (let j = 0; j < data.length; j += 4) { if (data[j] > 230 && data[j+1] > 230 && data[j+2] > 230) data[j+3] = 0; }
+                        tempCtx.putImageData(imageData, 0, 0); cleanedImages.current[e.img] = canvas;
+                    }
+                }
+                const cleanedImg = cleanedImages.current[e.img] || mImg;
                 ctx.save();
-                // Lägg till ett filter för att minska vita kanter (ljusa partier)
-                ctx.filter = 'contrast(1.1) brightness(0.95)'; 
-                if (e.dx > 0) { ctx.translate(e.x + e.w, e.y); ctx.scale(-1, 1); ctx.drawImage(mImg, 0, 0, e.w, e.h); }
-                else ctx.drawImage(mImg, e.x, e.y, e.w, e.h);
+                if (e.dx > 0) { ctx.translate(e.x + e.w, e.y); ctx.scale(-1, 1); ctx.drawImage(cleanedImg, 0, 0, e.w, e.h); }
+                else { ctx.drawImage(cleanedImg, e.x, e.y, e.w, e.h); }
                 ctx.restore();
             } else { ctx.fillStyle = "#8b5cf6"; ctx.fillRect(e.x, e.y, e.w, e.h); }
 
+            // Kollisionshantering spelare <-> fiende (v1.37: Cleaned & Visible)
             if (s.x < e.x + e.w - 25 && s.x + 140 > e.x + 25 && s.y < e.y + e.h - 35 && s.y + 140 > e.y + 15) {
-                if (s.spin) { s.enemies.splice(i, 1); s.score += 100; s.energy = Math.min(100, s.energy + 20); for(let k=0; k<12; k++) s.particles.push({ x: e.x+50, y: e.y+60, dx: (Math.random()-0.5)*12, dy: (Math.random()-0.5)*12, life: 40, size: 5, color: '#ffcc00', type: 'spark' }); }
-                else { s.active = false; onGameOver(s.score); }
-            }
-        });
+                const isClashingFromAbove = s.dy > 0 && s.y + 120 < e.y + 30;
+                
+                if (s.spin || isClashingFromAbove) { 
+                    s.enemies.splice(i, 1); s.score += 100; setCurrentScore(s.score);
+                    s.energy = Math.min(100, s.energy + 20); 
+                    playSFX('soundreality-explosion-8-bit-13-314697.mp3', 0.6);
+                    for(let k=0; k<12; k++) s.particles.push({ x: e.x+50, y: e.y+60, dx: (Math.random()-0.5)*12, dy: (Math.random()-0.5)*12, life: 40, size: 5, color: '#ffcc00', type: 'spark' }); 
+                    
+                    if (isClashingFromAbove) {
+                        s.dy = -15; // Kraftigare studs
+                        s.y -= 20;
+                    }
+                }
+                else if (s.active) { 
+                  let floorBetween = false;
+                  for (const p of s.plats) {
+                      if (s.x + 70 > p.x && s.x + 70 < p.x + p.w) {
+                          if (p.y > s.y + 100 && p.y < e.y + 20) {
+                              floorBetween = true;
+                              break;
+                          }
+                      }
+                  }
 
-        s.projs.forEach((pr, i) => {
+                  if (!floorBetween) {
+                    s.active = false; 
+                    playSFX('lolo_s-down-474082.mp3', 1.0); 
+                    setTimeout(() => {
+                      onGameOverRef.current(s.score);
+                    }, 1500); 
+                  }
+                }
+            }
+        }
+
+        for (let i = s.projs.length - 1; i >= 0; i--) {
+            const pr = s.projs[i];
             pr.x += pr.dx;
             const pGrad = ctx.createRadialGradient(pr.x, pr.y, 0, pr.x, pr.y, 40);
             pGrad.addColorStop(0, 'white'); pGrad.addColorStop(0.3, pr.c); pGrad.addColorStop(1, 'transparent');
             ctx.fillStyle = pGrad; ctx.beginPath(); ctx.arc(pr.x, pr.y, 40, 0, Math.PI*2); ctx.fill();
-            s.enemies.forEach((e, ei) => {
-                if (pr.x > e.x && pr.x < e.x + e.w && pr.y > e.y && pr.y < e.y + e.h) { s.enemies.splice(ei, 1); s.projs.splice(i, 1); s.score += 100; s.energy = Math.min(100, s.energy + 10); for(let k=0; k<15; k++) s.particles.push({ x: e.x+60, y: e.y+70, dx: (Math.random()-0.5)*15, dy: (Math.random()-0.5)*15, life: 30, size: 3, color: pr.c, type: 'spark' }); }
-            });
-            if (pr.x > s.boss.x && pr.x < s.boss.x + s.boss.w && pr.y > s.boss.y && pr.y < s.boss.y + s.boss.h) { s.boss.hp--; s.projs.splice(i, 1); if (s.boss.hp <= 0) { s.active = false; onLevelComplete(s.score + level.bossPoints + (s.timeLeft * 50)); } }
-        });
+
+            for (let ei = s.enemies.length - 1; ei >= 0; ei--) {
+                const e = s.enemies[ei];
+                if (pr.x > e.x && pr.x < e.x + e.w && pr.y > e.y && pr.y < e.y + e.h) { 
+                    s.enemies.splice(ei, 1); s.projs.splice(i, 1); 
+                    s.score += 100; setCurrentScore(s.score);
+                    s.energy = Math.min(100, s.energy + 10); 
+                    playSFX('u_b32baquv5u-explosion-2-340454.mp3', 0.8);
+                    for(let k=0; k<15; k++) s.particles.push({ x: e.x+60, y: e.y+70, dx: (Math.random()-0.5)*15, dy: (Math.random()-0.5)*15, life: 30, size: 3, color: pr.c, type: 'spark' }); 
+                    break;
+                }
+            }
+            if (!s.projs[i]) continue;
+
+            const b = s.boss;
+            if (pr.x > b.x && pr.x < b.x + b.w && pr.y > b.y && pr.y < b.y + b.h && b.x < s.cameraX + 850) { 
+                b.hp -= 1; b.hitT = 10; s.projs.splice(i, 1); s.shake = 5;
+                if (b.hp <= 0 && s.active) { 
+                    s.active = false; 
+                    playSFX('lesiakower-level-up-enhancement-8-bit-retro-sound-effect-153002.mp3', 1.0); 
+                    for(let k=0; k<50; k++) s.particles.push({ x: b.x + b.w/2, y: b.y + b.h/2, dx: (Math.random()-0.5)*30, dy: (Math.random()-0.5)*30, life: 100, size: 8, color: '#ffcc00', type: 'spark' });
+                    const finalS = s.score + (level?.bossPoints || 0) + (s.timeLeft * 50);
+                    setTimeout(() => onLevelCompleteRef.current(finalS), 2000); 
+                } 
+            }
+        }
 
         if (s.x > level.length - 3000) {
             s.boss.attackCd--;
@@ -367,20 +603,25 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
             }
         }
 
-        s.bossProjs.forEach((bp, i) => {
+        for (let i = s.bossProjs.length - 1; i >= 0; i--) {
+            const bp = s.bossProjs[i];
             bp.x += bp.dx; bp.y += bp.dy;
             const bpG = ctx.createRadialGradient(bp.x, bp.y, 0, bp.x, bp.y, bp.r);
             bpG.addColorStop(0, 'white'); bpG.addColorStop(0.4, bp.c); bpG.addColorStop(1, 'transparent');
             ctx.fillStyle = bpG; ctx.beginPath(); ctx.arc(bp.x, bp.y, bp.r, 0, Math.PI*2); ctx.fill();
             
             if (Math.hypot(bp.x - (s.x + 70), bp.y - (s.y + 80)) < bp.r + 40 && !s.spin) { 
-                // Is-skott saktar ner spelaren
                 if (bp.type === 'ice') { s.dx *= 0.3; }
-                else { s.active = false; onGameOver(s.score); }
+                else if (s.active) { 
+                  s.active = false; 
+                  playSFX('lolo_s-down-474082.mp3', 1.0); 
+                  const finalS = s.score;
+                  setTimeout(() => onGameOverRef.current(finalS), 1500);
+                }
                 s.bossProjs.splice(i, 1);
             }
-            if (bp.x < s.cameraX - 100 || bp.x > s.cameraX + 900 || bp.y < -100 || bp.y > 700) s.bossProjs.splice(i, 1);
-        });
+            else if (bp.x < s.cameraX - 100 || bp.x > s.cameraX + 900 || bp.y < -100 || bp.y > 700) s.bossProjs.splice(i, 1);
+        }
 
         const nImg = images.current[ninja.id.toLowerCase()];
         ctx.save(); ctx.translate(s.x + 70, s.y + 80); if (!s.fR) ctx.scale(-1, 1);
@@ -390,16 +631,87 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
 
         if (s.spin) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const sG = ctx.createRadialGradient(s.x+70, s.y+80, 0, s.x+70, s.y+80, 140); sG.addColorStop(0, 'white'); sG.addColorStop(0.5, ninja.color); sG.addColorStop(1, 'transparent'); ctx.fillStyle = sG; ctx.beginPath(); ctx.arc(s.x+70, s.y+80, 140, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
         
-        if (s.x > level.length - 2500) {
-            const bImg = images.current[s.boss.img];
-            if (bImg?.complete && bImg.naturalWidth > 0) ctx.drawImage(bImg, s.boss.x, s.boss.y, s.boss.w, s.boss.h);
-            ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(s.cameraX+200, 30, 400, 25);
-            ctx.fillStyle = "#ff4444"; ctx.fillRect(s.cameraX+200, 30, 400*(s.boss.hp/s.boss.max), 25);
-            ctx.strokeStyle = "white"; ctx.strokeRect(s.cameraX+200, 30, 400, 25);
-            ctx.fillStyle = "white"; ctx.font = "bold 16px Arial"; ctx.textAlign = "center";
-            ctx.fillText(s.boss.img.toUpperCase().replace('.PNG', ''), s.cameraX+400, 25);
+        if (s.x > level.length - 2800) {
+            const b = s.boss;
+            // Byt till läskig boss-musik när bossen dyker upp
+            if (audioRef.current && audioRef.current.src.indexOf('boss') === -1) {
+                audioRef.current.pause();
+                const bossAudio = new Audio('/audio/imij-stairs-to-the-boss-fight-322652.mp3');
+                bossAudio.loop = true; bossAudio.volume = 0.5;
+                bossAudio.play().catch(() => {});
+                audioRef.current = bossAudio;
+            }
+
+             // Kollision med bossen (bara om bossen är "aktiverad" / i närheten)
+            if (b && b.hp > 0 && b.x < s.cameraX + 1000) {
+              if (Math.abs(s.x + 70 - (b.x + b.w/2)) < 150 && Math.abs(s.y + 80 - (b.y + b.h/2)) < 200) {
+                if (s.spin) {
+                    b.hp -= 2; // Spin gör mer skada på bossen
+                    b.hitT = 10;
+                    if (b.hp <= 0) {
+                        s.active = false;
+                        s.score += 2000; 
+                        setCurrentScore(s.score);
+                        playSFX('lesiakower-level-up-enhancement-8-bit-retro-sound-effect-153002.mp3');
+                        s.shake = 20;
+                        for(let k=0; k<30; k++) s.particles.push({ 
+                            x: b.x + b.w/2, y: b.y + b.h/2, 
+                            dx: (Math.random()-0.5)*20, dy: (Math.random()-0.5)*20, 
+                            life: 60, size: 8, color: '#f0f', type: 'void' 
+                        });
+                        const timeBonus = Math.floor(s.timeLeft * 50);
+                        const finalS = s.score + timeBonus;
+                        setTimeout(() => onLevelCompleteRef.current(finalS), 2000);
+                    }
+                } else if (s.active) { 
+                    s.active = false;
+                    playSFX('lolo_s-down-474082.mp3', 1.0); 
+                    const finalS = s.score;
+                    setTimeout(() => onGameOverRef.current(finalS), 1500);
+                }
+              }
+            }
+
+            if (b.hitT > 0) b.hitT--;
+            const bImg = images.current[b.img];
+            if (bImg?.complete && bImg.naturalWidth > 0) {
+                if (!cleanedImages.current[b.img]) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = bImg.naturalWidth; canvas.height = bImg.naturalHeight;
+                    const tempCtx = canvas.getContext('2d');
+                    if (tempCtx) {
+                        tempCtx.drawImage(bImg, 0, 0);
+                        const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
+                        const data = imageData.data;
+                        for (let j = 0; j < data.length; j += 4) { if (data[j] > 230 && data[j+1] > 230 && data[j+2] > 230) data[j+3] = 0; }
+                        tempCtx.putImageData(imageData, 0, 0);
+                        cleanedImages.current[b.img] = canvas;
+                    }
+                }
+                const cleanedBossImg = cleanedImages.current[b.img] || bImg;
+                ctx.save();
+                if (b.hitT % 2 === 1) ctx.filter = 'brightness(2) sepia(1) hue-rotate(-50deg) saturate(5)';
+                ctx.drawImage(cleanedBossImg, b.x, b.y, b.w, b.h);
+                ctx.restore();
+            }
+
+            // Boss HP Bar & Name - VISAS BARA NÄR BOSSEN ÄR SYNLIG
+            if (b.x < s.cameraX + 800) {
+              ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(s.cameraX+200, 30, 400, 30);
+              ctx.fillStyle = b.hp/b.max < 0.3 ? '#ff4444' : '#ffcc00'; ctx.fillRect(s.cameraX+200, 30, 400*(b.hp/b.max), 30);
+              ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.strokeRect(s.cameraX+200, 30, 400, 30);
+              ctx.fillStyle = "white"; ctx.font = "black 18px Orbitron, sans-serif"; ctx.textAlign = "center";
+              const bossName = level.number === 6 ? "THE OVERLORD" : b.img.toUpperCase().replace('.PNG', '');
+              ctx.fillText(bossName, s.cameraX+400, 52);
+            }
         }
         ctx.restore();
+
+        if (s.shake > 0) {
+            ctx.translate((Math.random()-0.5)*s.shake, (Math.random()-0.5)*s.shake);
+            s.shake *= 0.9;
+            if (s.shake < 0.2) s.shake = 0;
+        }
 
         if (frames % 10 === 0) { setCurrentScore(s.score); setSpinEnergy(s.energy); setDisplayTime(s.timeLeft); }
         raf = requestAnimationFrame(loop);
@@ -412,21 +724,37 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
   return (
     <div 
         ref={containerRef}
-        className={`relative w-full overflow-hidden bg-black select-none touch-none ${isMobile ? 'fixed inset-0 z-[10000] h-[100dvh]' : 'aspect-video rounded-3xl border-4 border-white/10 shadow-2xl'}`}
-        style={{ "-webkit-user-select": "none", "-webkit-touch-callout": "none" } as any}
+        className={`relative w-full overflow-hidden bg-black no-select no-touch-callout ${isMobile ? 'fixed inset-0 z-[10000] h-[100dvh]' : 'aspect-video rounded-3xl border-4 border-white/10 shadow-2xl'}`}
     >
       <canvas ref={canvasRef} width={800} height={600} className="w-full h-full object-contain" />
+
+      {/* Nivå Intro Overlay */}
+      {showLevelIntro && (
+        <div className="absolute inset-0 z-[5000] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-500">
+            <div className="text-center transform animate-in zoom-in duration-700">
+                <h2 className="text-7xl font-black text-primary italic uppercase tracking-tighter drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]">NIVÅ {level.number}</h2>
+                <h3 className="text-3xl font-bold text-white uppercase tracking-[0.3em] mt-2 drop-shadow-lg">{level.name}</h3>
+                <div className="h-1 w-48 bg-primary mx-auto mt-6 rounded-full shadow-lg" />
+            </div>
+        </div>
+      )}
       
       {!gameStarted && (
         <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-black/85 backdrop-blur-3xl px-12 text-center text-white">
             <div className={`bg-white/10 rounded-full mb-6 p-4 border border-white/20 animate-pulse overflow-hidden ${isMobile ? 'w-20 h-20' : 'w-32 h-32'}`}>
-                <img src="/LNERI2019.jpg" className="w-full h-full object-cover rounded-full" alt="Ninjago" />
+                <img src="/icon.png" className="w-full h-full object-cover rounded-full" alt="Ninjago" />
             </div>
             <h2 className={`${isMobile ? 'text-3xl' : 'text-6xl'} font-black italic mb-2 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 uppercase`}>BANA {level.number}</h2>
             <h3 className={`${isMobile ? 'text-xl' : 'text-4xl'} font-bold text-white uppercase mb-4 tracking-widest`}>{level.name}</h3>
             
             <div className="flex flex-col gap-4 items-center">
-                <button onPointerDown={handleStartGame} className={`group relative bg-gradient-to-br from-red-600 to-red-800 text-white font-black rounded-[2rem] shadow-[0_15px_40px_rgba(255,0,0,0.5)] border-b-[12px] border-red-950 active:border-0 active:translate-y-2 transition-all duration-75 ${isMobile ? 'px-8 py-4 text-2xl' : 'px-20 py-10 text-5xl'}`}>STARTA STRIDEN!</button>
+                <button 
+                    onClick={handleStartGame}
+                    onPointerDown={handleStartGame} 
+                    className={`group relative bg-gradient-to-br from-red-600 to-red-800 text-white font-black rounded-[2rem] shadow-[0_15px_40px_rgba(255,0,0,0.5)] border-b-[12px] border-red-950 active:border-0 active:translate-y-2 transition-all duration-75 ${isMobile ? 'px-8 py-4 text-2xl' : 'px-20 py-10 text-5xl'}`}
+                >
+                    STARTA STRIDEN!
+                </button>
                 {deferredPrompt && <button onPointerDown={handleInstallClick} className="px-6 py-2 bg-white/5 hover:bg-white/10 backdrop-blur-md rounded-lg border border-white/10 text-white font-bold text-sm animate-bounce mt-2">📲 INSTALLERA SNABBT</button>}
             </div>
         </div>

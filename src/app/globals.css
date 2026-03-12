@@ -103,3 +103,15 @@ canvas {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   @apply bg-primary/40;
 }
+
+@layer base {
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  .no-touch-callout {
+    -webkit-touch-callout: none;
+  }
+}

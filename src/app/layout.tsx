@@ -23,9 +23,14 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <link rel="apple-touch-icon" href="/LNERI2019.jpg" />
-        <link rel="icon" type="image/jpeg" href="/LNERI2019.jpg" />
+        <meta name="apple-mobile-web-app-title" content="Ninjago" />
+        <link rel="apple-touch-icon" href="/icon.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icon.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icon.png" />
+        <link rel="apple-touch-icon" sizes="167x167" href="/icon.png" />
+        <link rel="icon" type="image/png" href="/icon.png" />
         <meta name="theme-color" content="#EF4444" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <script dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
