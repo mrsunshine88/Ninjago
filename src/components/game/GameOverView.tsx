@@ -15,7 +15,7 @@ interface GameOverViewProps {
   onRetry?: () => void;
 }
 
-export function GameOverView({ playerName, finalScore, isHighScore, isMuted, onReset, onRetry }: GameOverViewProps) {
+export function GameOverView({ playerName, finalScore, isHighScore, isGameWon, isMuted, onReset, onRetry }: GameOverViewProps) {
   const [countdown, setCountdown] = useState(20);
   const [displayScore, setDisplayScore] = useState(0);
   const [particles, setParticles] = useState<{id: number, x: number, y: number, color: string, size: number, angle: number, speed: number}[]>([]);
@@ -57,7 +57,7 @@ export function GameOverView({ playerName, finalScore, isHighScore, isMuted, onR
   }, [isHighScore, isGameWon, isMuted]);
 
   useEffect(() => {
-    if (isHighScore) {
+    if (isHighScore || isGameWon) {
       const pTimer = setInterval(() => {
         setParticles(prev => prev.map(p => ({
           ...p,
