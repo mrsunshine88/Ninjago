@@ -67,7 +67,7 @@ export function GameOverView({ playerName, finalScore, isHighScore, isGameWon, i
       }, 50);
       return () => clearInterval(pTimer);
     }
-  }, [isHighScore]);
+  }, [isHighScore, isGameWon]);
 
   useEffect(() => {
     if (countdown === 0) {
@@ -76,8 +76,8 @@ export function GameOverView({ playerName, finalScore, isHighScore, isGameWon, i
   }, [countdown, onReset]);
 
   return (
-    <div className={`min-h-screen relative overflow-hidden flex flex-col items-center justify-center p-6 gap-8 text-center animate-in zoom-in duration-700 ${isHighScore ? 'bg-yellow-500/10' : ''}`}>
-      {isHighScore && particles.map(p => (
+    <div className={`min-h-screen relative overflow-hidden flex flex-col items-center justify-center p-6 gap-8 text-center animate-in zoom-in duration-700 ${isHighScore || isGameWon ? 'bg-yellow-500/10' : ''}`}>
+      {(isHighScore || isGameWon) && particles.map(p => (
         <div 
           key={p.id}
           className="absolute pointer-events-none z-0"
@@ -134,8 +134,8 @@ export function GameOverView({ playerName, finalScore, isHighScore, isGameWon, i
           {playerName}
         </div>
         
-        <div className={`py-6 rounded-[30px] border-4 ${isHighScore ? 'border-yellow-400 bg-yellow-400/10 gold-glow' : 'border-white/10 bg-black/40'}`}>
-          <div className={`text-6xl md:text-7xl font-black font-mono tracking-tighter ${isHighScore ? 'high-score-text scale-105' : 'text-primary'}`}>
+        <div className={`py-6 rounded-[30px] border-4 ${isHighScore || isGameWon ? 'border-yellow-400 bg-yellow-400/10 gold-glow' : 'border-white/10 bg-black/40'}`}>
+          <div className={`text-6xl md:text-7xl font-black font-mono tracking-tighter ${isHighScore || isGameWon ? 'high-score-text scale-105' : 'text-primary'}`}>
             {displayScore.toLocaleString()}
           </div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-[0.3em] mt-2 font-black">Poäng Totalt</div>
