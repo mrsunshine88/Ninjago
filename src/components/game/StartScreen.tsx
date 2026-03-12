@@ -55,14 +55,21 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
   };
 
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
   const menuMusicRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    window.addEventListener("beforeinstallprompt", (e) => {
+    const handler = (e: any) => {
       e.preventDefault();
       setInstallPrompt(e);
-    });
+      // Visa bannern automatiskt efter 2 sekunder på mobil
+      setTimeout(() => setShowInstallBanner(true), 2000);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
 
+  useEffect(() => {
     // Skapa musikobjektet endast en gång
     if (!menuMusicRef.current) {
         menuMusicRef.current = new Audio('/audio/lucadialessandro-arcade-melody-295434.mp3');
@@ -82,7 +89,6 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
     
     return () => {
       // Vi behåller ref men pausar om komponenten avmonteras helt
-      // (Fast här växlar vi bara props, så vi pausar inte nödvändigtvis)
     };
   }, [isMuted]);
 
@@ -101,18 +107,44 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
     if (!installPrompt) return;
     installPrompt.prompt();
     const { outcome } = await installPrompt.userChoice;
-    if (outcome === "accepted") setInstallPrompt(null);
+    if (outcome === "accepted") { setInstallPrompt(null); setShowInstallBanner(false); }
+    setShowInstallBanner(false);
   };
 
   return (
     <div className="relative min-h-screen w-full flex flex-col items-center justify-center p-6 gap-8 overflow-hidden cursor-default">
-      {/* PWA Install Button */}
-      {installPrompt && (
+      {/* PWA Install Banner - stor och tydlig, syns på mobil */}
+      {showInstallBanner && installPrompt && (
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center pointer-events-none">
+          <div className="pointer-events-auto w-full max-w-lg mx-4 mb-6 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-3xl shadow-[0_0_60px_rgba(251,191,36,0.5)] border-4 border-white p-6 animate-in slide-in-from-bottom duration-500">
+            <div className="flex items-center gap-4">
+              <img src="/icon.png" className="w-16 h-16 rounded-2xl shadow-lg flex-shrink-0" alt="Ninjago" />
+              <div className="flex-1">
+                <div className="text-black font-black text-xl uppercase leading-tight">Lägg till på startsidan!</div>
+                <div className="text-black/70 text-sm font-bold mt-0.5">Spela Ninjago som en riktig app 🥷</div>
+              </div>
+              <button
+                onClick={() => setShowInstallBanner(false)}
+                className="text-black/50 text-2xl font-black hover:text-black leading-none w-8 h-8 flex items-center justify-center"
+              >✕</button>
+            </div>
+            <button
+              onClick={handleInstall}
+              className="mt-4 w-full py-4 bg-black text-yellow-400 font-black text-xl uppercase rounded-2xl shadow-lg active:scale-95 transition-all tracking-widest"
+            >
+              📲 INSTALLERA NU!
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Liten install-knapp om bannern stängts */}
+      {installPrompt && !showInstallBanner && (
         <button 
-          onClick={handleInstall}
-          className="absolute top-6 left-6 px-6 py-3 bg-yellow-400 text-black font-black rounded-full shadow-2xl animate-bounce z-50 flex items-center gap-2 border-2 border-black"
+          onClick={() => setShowInstallBanner(true)}
+          className="absolute top-6 left-6 px-4 py-2 bg-yellow-400 text-black font-black rounded-full shadow-2xl z-50 flex items-center gap-2 border-2 border-black text-sm"
         >
-          LADDA NER APPEN 📱
+          📲 INSTALLERA
         </button>
       )}
 
@@ -231,15 +263,13 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
         </div>
       </div>
 
-      {/* Version Tag - Bottom Left (Now bigger and clearer) v1.37 */}
-      <div className="absolute bottom-4 left-6 text-white/60 text-[14px] font-black uppercase tracking-[0.2em] z-50 pointer-events-none select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] italic">
-        v1.37
+      {/* Version Tag - v1.39, nedre vänster */}
+      <div className="absolute bottom-4 left-4 text-white/50 text-[12px] font-black uppercase tracking-[0.2em] z-50 pointer-events-none select-none italic">
+        v1.39
       </div>
 
-      {/* Credit Text - Placeras under allt på mobil, nere i hörnet på desktop */}
-      <div 
-        className={`mt-8 lg:mt-0 lg:absolute lg:bottom-5 ${isAdminMode ? 'lg:right-5' : 'lg:right-5'} text-[#FFD700] text-[12px] md:text-[16px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] z-50 pointer-events-none select-none text-center whitespace-nowrap`}
-      >
+      {/* Credit Text - alltid centrerat längst ned, krockar ej med version */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[#FFD700] text-[11px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] z-50 pointer-events-none select-none whitespace-nowrap">
         Game Idea & Design by Lukas Persson
       </div>
     </div>

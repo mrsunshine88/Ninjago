@@ -76,15 +76,13 @@ export default function NinjagoGame() {
   }, [finishGame]);
 
   const handleRetry = useCallback(() => {
-    setGameState('menu');
+    // Spara poängen innan retry (om spelet kördes)
     setScore(0);
     setGameOverData(null);
     setCurrentLevelIdx(0);
-    
-    setTimeout(() => {
-      setRetryCount(prev => prev + 1);
-      setGameState('playing');
-    }, 50);
+    // Öka retryCount direkt för att tvinga GameEngine att återmonteras
+    setRetryCount(prev => prev + 1);
+    setGameState('playing');
   }, []);
 
   const handleReset = useCallback(() => {

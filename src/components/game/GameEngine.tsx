@@ -47,6 +47,8 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
         audioRef.current.volume = isMuted ? 0 : 0.4;
     }
   }, [onGameOver, onLevelComplete, isMuted]);
+  const [lives, setLives] = useState(3);
+  const [comboDisplay, setComboDisplay] = useState(0);
   const [highScore, setHighScore] = useState(0);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   
@@ -67,7 +69,15 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
     particles: [] as Particle[],
     boss: { hp: 1, max: 1, active: false, x: 0, y: 0, w: 0, h: 0, img: '', attackCd: 0, hitT: 0 },
     shake: 0,
-    initDone: false
+    initDone: false,
+    // Nya features
+    lives: 3,
+    invincible: 0,      // Nedcount i frames (60fps = 120 frames = 2 sek)
+    combo: 0,           // Antal kills i rad
+    comboTimer: 0,      // Nedcount för att nollställa combo
+    coins: [] as {x: number, y: number, collected: boolean}[],
+    comboTextLife: 0,   // Hur länge combo-texten visas
+    comboTextVal: 0,    // Vilket combovärde att visa
   });
 
   const touch = useRef({ left: false, right: false, jump: false, fire: false, spin: false });
@@ -159,19 +169,6 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
     state.current.started = true;
     setGameStarted(true);
     playSFX('lolo_s-start-474092.mp3', 0.8);
-    
-    if (isMobile && containerRef.current) {
-      const container = containerRef.current;
-      try {
-        if (container.requestFullscreen) {
-          await container.requestFullscreen();
-        } else if ((container as any).webkitRequestFullscreen) {
-          await (container as any).webkitRequestFullscreen();
-        }
-      } catch (err) {
-        console.warn("Kunde inte gå i fullskärm automatiskt:", err);
-      }
-    }
   };
 
   const handleInstallClick = async () => {
@@ -209,28 +206,32 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
         
         state.current.plats = platforms;
         
-        // Smart fiendegenerering: Slumpmässigt antal och olika typer
+        // Smart fiendegenerering: Anpassad svårighetsgrad per nivå
         const enemies: any[] = [];
+        const lvlNum = level.number || 1;
+        
         platforms.forEach((p, i) => {
             if (i === 0 || p.w < 200) return;
             
-            // Fler fiender och högre chans på alla nivåer
-            const maxE = Math.min(5, 2 + Math.floor(level.difficulty));
-            const count = Math.floor(Math.random() * maxE) + 2; 
+            // Nivå 1: max 2 fiender per plattform, nivå 6: max 5
+            const maxE = Math.min(5, 1 + Math.floor(lvlNum * 0.8));
+            const count = Math.floor(Math.random() * maxE) + 1; 
             
             for (let j = 0; j < count; j++) {
-                // Lägre tröskel = fler fiender som faktiskt spawnar
-                const spawnThreshold = 0.35 - (level.difficulty * 0.05); 
+                // Högre tröskel = färre fiender på lägre nivåer
+                const spawnThreshold = 0.7 - (lvlNum * 0.08); // Nivå 1: 62% chans, Nivå 6: 22% chans (inverterat: Math.random() > threshold)
                 if (Math.random() > spawnThreshold) {
                     const offset = (p.w / (count + 1)) * (j + 1);
                     const enemyX = p.x + offset;
                     const mFile = monsterFiles[Math.floor(Math.random() * monsterFiles.length)];
+                    // Hastighet skalas med nivå: Nivå 1 slow, Nivå 6 fast
+                    const speed = 1.0 + (lvlNum - 1) * 0.5 + Math.random() * 0.5;
                     enemies.push({ 
                         x: enemyX, 
                         y: p.y - 140, 
                         w: 120, 
                         h: 140, 
-                        dx: (level.number === 1 ? -1.5 : -2.2 - (level.difficulty * 0.3)), 
+                        dx: -speed,
                         dy: 0, 
                         img: mFile.toLowerCase(), 
                         origX: enemyX, 
@@ -241,18 +242,20 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
             }
         });
 
-        // Extra procedurfiender på markplan för mer action (mellan x=1500 och bossen)
-        for (let gx = 1500; gx < len - 3000; gx += (800 + Math.random() * 1200)) {
+        // Extra markfiender: Fler på högre nivåer
+        const groundEnemyInterval = Math.max(600, 2000 - lvlNum * 250);
+        for (let gx = 1500; gx < len - 3000; gx += (groundEnemyInterval + Math.random() * 800)) {
             const mFile = monsterFiles[Math.floor(Math.random() * monsterFiles.length)];
+            const speed = 1.0 + (lvlNum - 1) * 0.5 + Math.random() * 0.8;
             enemies.push({
                 x: gx, 
-                y: 420, // Marknivå (560 - 140)
+                y: 420,
                 w: 120, h: 140,
-                dx: -2.5 - Math.random() * 2, 
+                dx: -speed, 
                 dy: 0,
                 img: mFile.toLowerCase(),
                 origX: gx, 
-                range: 400 + Math.random() * 800,
+                range: 400 + Math.random() * 600,
                 onG: true
             });
         }
@@ -274,6 +277,29 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
         // Flytta bossen till len - 800 så den hamnar mitt i sista vyn
         state.current.boss = { x: len - 800, y: 100, w: 500, h: 500, hp: bossHP, max: bossHP, active: false, img: bossImg.toLowerCase(), attackCd: 120, hitT: 0 };
         state.current.timeLeft = level?.timeLimit || 120;
+
+        // Generera mynt/kristaller på plattformar
+        const coins: {x: number, y: number, collected: boolean}[] = [];
+        platforms.forEach((p, pi) => {
+            if (pi === 0 || p.w < 150) return;
+            const numCoins = Math.floor(Math.random() * 3) + 2; // 2-4 mynt per plattform
+            for (let ci = 0; ci < numCoins; ci++) {
+                coins.push({ 
+                    x: p.x + (p.w / (numCoins + 1)) * (ci + 1),
+                    y: p.y - 25,
+                    collected: false
+                });
+            }
+        });
+        // Extra mynt på markplan
+        for (let gx = 800; gx < len - 2000; gx += 600 + Math.random() * 800) {
+            coins.push({ x: gx, y: 535, collected: false });
+        }
+        state.current.coins = coins;
+        state.current.lives = 3;
+        state.current.invincible = 0;
+        state.current.combo = 0;
+        state.current.comboTimer = 0;
         state.current.initDone = true;
     }
   }, [level, ninja]);
@@ -429,16 +455,56 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
             ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(plat.x, plat.y, plat.w, 4);
         });
 
+        // --- NEDCOUNT: combo-timer & invincibility ---
+        if (s.comboTimer > 0) s.comboTimer--;
+        else if (s.combo > 0) { s.combo = 0; }
+        if (s.invincible > 0) s.invincible--;
+        if (s.comboTextLife > 0) s.comboTextLife--;
+
+        // --- MYNT/KRISTALLER ---
+        s.coins.forEach((coin, ci) => {
+            if (coin.collected) return;
+            // Kolla kollision med spelaren
+            if (Math.abs((s.x + 70) - coin.x) < 50 && Math.abs((s.y + 80) - coin.y) < 50) {
+                coin.collected = true;
+                s.score += 50;
+                playSFX('sfx_lightning_8bit.wav', 0.2);
+                for (let k = 0; k < 8; k++) s.particles.push({
+                    x: coin.x, y: coin.y,
+                    dx: (Math.random()-0.5)*8, dy: -Math.random()*6,
+                    life: 30, size: 4, color: '#ffcc00', type: 'spark'
+                });
+                return;
+            }
+            // Rita mynt som glänsande gul cirkel
+            const bob = Math.sin(frames * 0.1 + ci) * 3; // Lätt svävning
+            ctx.save();
+            ctx.shadowBlur = 12; ctx.shadowColor = '#ffcc00';
+            ctx.fillStyle = '#ffcc00';
+            ctx.beginPath(); ctx.arc(coin.x, coin.y + bob, 10, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#fff8'; ctx.beginPath(); ctx.arc(coin.x - 3, coin.y + bob - 3, 3, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#ffaa00'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText('★', coin.x, coin.y + bob + 4);
+            ctx.restore();
+        });
+
         for (let i = s.enemies.length - 1; i >= 0; i--) {
             const e = s.enemies[i];
             e.dy += 0.8; e.y += e.dy;
+            let enemyOnGround = false;
             s.plats.forEach(plat => {
                 if (e.x + 10 < plat.x + plat.w && e.x + e.w - 10 > plat.x) {
-                    if (e.y + e.h > plat.y && e.y + e.h < plat.y + 40 + e.dy) { e.y = plat.y - e.h; e.dy = 0; }
+                    if (e.y + e.h > plat.y && e.y + e.h < plat.y + 40 + e.dy) { e.y = plat.y - e.h; e.dy = 0; enemyOnGround = true; }
                 }
             });
             const dist = (s.x + 70) - (e.x + 50);
+            // Positiv distY = spelaren är UNDER fienden (s.y > e.y)
             const distY = s.y - e.y;
+            
+            // Svårighetsbaserad hastighet per nivå
+            const lvl = level.number || 1;
+            const baseSpeed = 1.5 + (lvl - 1) * 0.6; // Nivå 1: 1.5, Nivå 6: 4.5
             
             if (Math.abs(dist) < 700 && Math.abs(distY) < 500) { 
                 // Kolla om fienden är på en plattform (och inte på marken)
@@ -450,40 +516,47 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
                     }
                 }
 
-                // Förbättrad AI-hopp logik (v1.37: Visibility Trim)
-                const isUnder = distY > 40;
-                // Skärmbredden är 800, så vi kräver att de är inom [cameraX + 50, cameraX + 750]
-                const isVisible = e.x > s.cameraX + 50 && e.x < s.cameraX + 750;
-                
-                // Om vi redan är i jumpMode, fortsätt tills vi lämnat plattformen
+                const isVisible = e.x > s.cameraX - 50 && e.x < s.cameraX + 850;
+                // Spelaren är UNDER fienden (distY > 80 = fienden är högre upp)
+                const playerIsBelow = distY > 80;
+                // Spelaren är OVANFÖR fienden – fienden ska ALDRIG hoppa upp
+                const playerIsAbove = distY < -20;
+
+                // Om vi redan är i jumpMode (hoppar ner), fortsätt tills vi lämnat plattformen
                 if (e.jumpMode) {
-                    e.dx = e.jumpMode === 'left' ? -7.5 : 7.5;
+                    e.dx = e.jumpMode === 'left' ? -(baseSpeed + 3) : (baseSpeed + 3);
                     
                     if (currentPlat) {
                         const toLeftEdge = e.x - currentPlat.x;
                         const toRightEdge = (currentPlat.x + currentPlat.w) - (e.x + e.w);
                         
-                        if (toLeftEdge < 50 && e.jumpMode === 'left') { 
-                            e.x -= 80; // Knuffa ut ordentligt
+                        if (toLeftEdge < 30 && e.jumpMode === 'left') { 
+                            e.x -= 100; // Knuffa ut och falla ner
                             e.jumpMode = null; 
                         }
-                        else if (toRightEdge < 50 && e.jumpMode === 'right') { 
-                            e.x += 80;
+                        else if (toRightEdge < 30 && e.jumpMode === 'right') { 
+                            e.x += 100;
                             e.jumpMode = null; 
                         }
                     } else {
                         e.jumpMode = null; // Vi faller redan
                     }
                 } 
-                else if (isUnder && currentPlat && isVisible) {
-                    // Starta hoppet och håll kvar det! ENDAST OM SYNLIG!
+                else if (playerIsBelow && currentPlat && enemyOnGround && isVisible) {
+                    // Spelaren är nedanför – hoppa NED mot spelaren
                     e.jumpMode = dist < 0 ? 'left' : 'right';
-                    e.dx = e.jumpMode === 'left' ? -7.5 : 7.5;
+                    e.dx = e.jumpMode === 'left' ? -(baseSpeed + 3) : (baseSpeed + 3);
+                }
+                else if (!playerIsAbove) {
+                    // Springer mot spelaren på samma plan (aldrig hoppa upp)
+                    e.jumpMode = null; 
+                    e.dx = dist > 0 ? baseSpeed : -baseSpeed; 
+                    // ALDRIG hoppa uppåt – tag bort den gamla upphopp-logiken helt
                 }
                 else {
-                    e.jumpMode = null; 
-                    e.dx = dist > 0 ? 4.5 : -4.5; 
-                    if (distY < -120 && e.dy === 0) { e.dy = -15; e.y -= 5; }
+                    // Spelaren är ovanför – patrullera istället, hoppa INTE
+                    e.jumpMode = null;
+                    e.dx = dist > 0 ? baseSpeed * 0.5 : -baseSpeed * 0.5;
                 }
                 e.x += e.dx; 
             }
@@ -510,38 +583,51 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
                 ctx.restore();
             } else { ctx.fillStyle = "#8b5cf6"; ctx.fillRect(e.x, e.y, e.w, e.h); }
 
-            // Kollisionshantering spelare <-> fiende (v1.37: Cleaned & Visible)
+            // Kollisionshantering spelare <-> fiende
             if (s.x < e.x + e.w - 25 && s.x + 140 > e.x + 25 && s.y < e.y + e.h - 35 && s.y + 140 > e.y + 15) {
                 const isClashingFromAbove = s.dy > 0 && s.y + 120 < e.y + 30;
                 
                 if (s.spin || isClashingFromAbove) { 
-                    s.enemies.splice(i, 1); s.score += 100; setCurrentScore(s.score);
+                    s.enemies.splice(i, 1);
+                    // COMBO-system
+                    s.combo++;
+                    s.comboTimer = 120; // 2 sekunder
+                    const bonus = s.combo > 1 ? s.combo * 50 : 0;
+                    s.score += 100 + bonus;
+                    if (s.combo > 1) {
+                        s.comboTextVal = s.combo;
+                        s.comboTextLife = 90;
+                    }
+                    setCurrentScore(s.score);
                     s.energy = Math.min(100, s.energy + 20); 
                     playSFX('soundreality-explosion-8-bit-13-314697.mp3', 0.6);
                     for(let k=0; k<12; k++) s.particles.push({ x: e.x+50, y: e.y+60, dx: (Math.random()-0.5)*12, dy: (Math.random()-0.5)*12, life: 40, size: 5, color: '#ffcc00', type: 'spark' }); 
                     
-                    if (isClashingFromAbove) {
-                        s.dy = -15; // Kraftigare studs
-                        s.y -= 20;
-                    }
+                    if (isClashingFromAbove) { s.dy = -15; s.y -= 20; }
                 }
-                else if (s.active) { 
+                else if (s.active && s.invincible === 0) { 
                   let floorBetween = false;
                   for (const p of s.plats) {
                       if (s.x + 70 > p.x && s.x + 70 < p.x + p.w) {
-                          if (p.y > s.y + 100 && p.y < e.y + 20) {
-                              floorBetween = true;
-                              break;
-                          }
+                          if (p.y > s.y + 100 && p.y < e.y + 20) { floorBetween = true; break; }
                       }
                   }
 
                   if (!floorBetween) {
-                    s.active = false; 
-                    playSFX('lolo_s-down-474082.mp3', 1.0); 
-                    setTimeout(() => {
-                      onGameOverRef.current(s.score);
-                    }, 1500); 
+                    s.lives--;
+                    setLives(s.lives);
+                    playSFX('lolo_s-down-474082.mp3', 0.8); 
+                    s.shake = 15;
+                    s.combo = 0; // Reset combo vid skada
+                    if (s.lives <= 0) {
+                        s.active = false;
+                        setTimeout(() => onGameOverRef.current(s.score), 1500);
+                    } else {
+                        // Respawn med invincibility
+                        s.invincible = 120; // 2 sekunder
+                        s.x = Math.max(100, s.cameraX + 50);
+                        s.y = 350; s.dx = 0; s.dy = 0;
+                    }
                   }
                 }
             }
@@ -610,13 +696,21 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
             bpG.addColorStop(0, 'white'); bpG.addColorStop(0.4, bp.c); bpG.addColorStop(1, 'transparent');
             ctx.fillStyle = bpG; ctx.beginPath(); ctx.arc(bp.x, bp.y, bp.r, 0, Math.PI*2); ctx.fill();
             
-            if (Math.hypot(bp.x - (s.x + 70), bp.y - (s.y + 80)) < bp.r + 40 && !s.spin) { 
+            if (Math.hypot(bp.x - (s.x + 70), bp.y - (s.y + 80)) < bp.r + 40 && !s.spin && s.invincible === 0) { 
                 if (bp.type === 'ice') { s.dx *= 0.3; }
-                else if (s.active) { 
-                  s.active = false; 
-                  playSFX('lolo_s-down-474082.mp3', 1.0); 
-                  const finalS = s.score;
-                  setTimeout(() => onGameOverRef.current(finalS), 1500);
+                else if (s.active) {
+                    s.lives--;
+                    setLives(s.lives);
+                    playSFX('lolo_s-down-474082.mp3', 0.8);
+                    s.shake = 12; s.combo = 0;
+                    if (s.lives <= 0) {
+                        s.active = false;
+                        setTimeout(() => onGameOverRef.current(s.score), 1500);
+                    } else {
+                        s.invincible = 120;
+                        s.x = Math.max(100, s.cameraX + 50);
+                        s.y = 350; s.dx = 0; s.dy = 0;
+                    }
                 }
                 s.bossProjs.splice(i, 1);
             }
@@ -624,20 +718,52 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
         }
 
         const nImg = images.current[ninja.id.toLowerCase()];
-        ctx.save(); ctx.translate(s.x + 70, s.y + 80); if (!s.fR) ctx.scale(-1, 1);
-        if (nImg?.complete && nImg.naturalWidth > 0) ctx.drawImage(nImg, -70, -80, 140, 160);
-        else { ctx.fillStyle = ninja.color; ctx.fillRect(-70, -80, 140, 160); }
-        ctx.restore();
+        // Spelarens blink-effekt under invincibility
+        const shouldDrawPlayer = s.invincible === 0 || frames % 8 < 5;
+        if (shouldDrawPlayer) {
+            ctx.save(); ctx.translate(s.x + 70, s.y + 80); if (!s.fR) ctx.scale(-1, 1);
+            if (s.invincible > 0) ctx.filter = 'brightness(2) sepia(1) hue-rotate(180deg)';
+            if (nImg?.complete && nImg.naturalWidth > 0) ctx.drawImage(nImg, -70, -80, 140, 160);
+            else { ctx.fillStyle = ninja.color; ctx.fillRect(-70, -80, 140, 160); }
+            ctx.restore();
+        }
+
+        // Combo-text på canvas
+        if (s.comboTextLife > 0) {
+            const alpha = s.comboTextLife / 90;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.font = 'bold 36px Orbitron, sans-serif';
+            ctx.fillStyle = '#ffcc00';
+            ctx.shadowBlur = 20; ctx.shadowColor = '#ff8800';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${s.comboTextVal}× COMBO! +${s.comboTextVal * 50}p`, s.x + 70, s.y - 20);
+            ctx.restore();
+        }
 
         if (s.spin) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const sG = ctx.createRadialGradient(s.x+70, s.y+80, 0, s.x+70, s.y+80, 140); sG.addColorStop(0, 'white'); sG.addColorStop(0.5, ninja.color); sG.addColorStop(1, 'transparent'); ctx.fillStyle = sG; ctx.beginPath(); ctx.arc(s.x+70, s.y+80, 140, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
         
+        // Boss-avståndsindikator (visas alltid utom när bossen är aktiv)
+        if (s.x < level.length - 2800) {
+          const progress = Math.min(1, s.x / (level.length - 3000));
+          ctx.save();
+          const bx = s.cameraX + 200, bw = 400;
+          ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(bx, 575, bw, 12);
+          ctx.fillStyle = '#ffcc00'; ctx.fillRect(bx, 575, bw * progress, 12);
+          ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 2; ctx.strokeRect(bx, 575, bw, 12);
+          ctx.fillStyle = 'white'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText('⚔️ BOSS', bx + bw + 24, 585);
+          ctx.restore();
+        }
+        
         if (s.x > level.length - 2800) {
             const b = s.boss;
-            // Byt till läskig boss-musik när bossen dyker upp
+            // Byt till boss-musik när bossen dyker upp (respektera mute)
             if (audioRef.current && audioRef.current.src.indexOf('boss') === -1) {
                 audioRef.current.pause();
                 const bossAudio = new Audio('/audio/imij-stairs-to-the-boss-fight-322652.mp3');
-                bossAudio.loop = true; bossAudio.volume = 0.5;
+                bossAudio.loop = true; 
+                bossAudio.volume = isMutedRef.current ? 0 : 0.5;
                 bossAudio.play().catch(() => {});
                 audioRef.current = bossAudio;
             }
@@ -713,7 +839,7 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
             if (s.shake < 0.2) s.shake = 0;
         }
 
-        if (frames % 10 === 0) { setCurrentScore(s.score); setSpinEnergy(s.energy); setDisplayTime(s.timeLeft); }
+        if (frames % 3 === 0) { setCurrentScore(s.score); setSpinEnergy(s.energy); setDisplayTime(s.timeLeft); setLives(s.lives); }
         raf = requestAnimationFrame(loop);
     };
 
@@ -762,10 +888,12 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
 
       {gameStarted && (
         <div className="absolute top-4 inset-x-4 z-[200] flex justify-between items-start pointer-events-none">
+            {/* Poäng */}
             <div className={`px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/10 text-white font-black shadow-xl flex items-center gap-2 ${isMobile ? 'text-lg' : 'text-3xl'}`}>
                 <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" /> {currentScore}
             </div>
             
+            {/* Spin-energi i mitten */}
             <div className="absolute left-1/2 -translate-x-1/2 top-2 flex flex-col items-center gap-0.5">
                 <div className="text-[8px] font-black text-white/30 tracking-[0.2em] uppercase">Spinjitzu (Z)</div>
                 <div className={`${isMobile ? 'w-24 h-2.5' : 'w-48 h-5'} bg-black/40 rounded-full border border-white/10 overflow-hidden relative`}>
@@ -773,45 +901,68 @@ export function GameEngine({ ninja, level, playerName, initialScore, isMuted, on
                 </div>
             </div>
 
-            <div className={`px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border ${displayTime < 30 ? 'border-red-500 text-red-500' : 'border-white/10 text-white'} font-black shadow-xl ${isMobile ? 'text-lg' : 'text-3xl'}`}>
-                {displayTime}s
+            {/* Liv + Tid – höger sida */}
+            <div className="flex flex-col items-end gap-1">
+                {/* Hjärtan – liv */}
+                <div className={`flex gap-0.5 ${isMobile ? 'text-xl' : 'text-3xl'}`}>
+                    {[1,2,3].map(i => (
+                        <span key={i} className={i <= lives ? 'text-red-500 drop-shadow-[0_0_6px_red]' : 'text-white/20'}>
+                            {i <= lives ? '❤️' : '🖤'}
+                        </span>
+                    ))}
+                </div>
+                {/* Timer */}
+                <div className={`px-3 py-0.5 bg-black/40 backdrop-blur-md rounded-lg border ${displayTime < 30 ? 'border-red-500 text-red-500' : 'border-white/10 text-white'} font-black shadow-xl ${isMobile ? 'text-base' : 'text-2xl'}`}>
+                    {displayTime}s
+                </div>
             </div>
         </div>
       )}
 
       {gameStarted && isMobile && (
-        <div className="absolute inset-0 z-[200] pointer-events-none px-4 pb-12 md:pb-4">
-             {/* Vänsterstyrning: Vänster/Höger pilar */}
-             <div className="absolute bottom-16 left-6 flex gap-4 pointer-events-auto">
-                <button 
-                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.left=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.left=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.left=false; }}
-                    className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white"
-                >←</button>
-                <button 
-                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.right=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.right=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.right=false; }}
-                    className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white"
-                >→</button>
-            </div>
+        <div className="absolute inset-0 z-[200] pointer-events-none">
+          {/* Vänsterstyrning: Vänster/Höger pilar */}
+          <div className="absolute bottom-8 left-4 flex gap-3 pointer-events-auto">
+            <button 
+                onPointerDown={(e)=>{ e.preventDefault(); touch.current.left=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.left=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.left=false; }}
+                style={{width:'80px',height:'80px'}}
+                className="bg-white/15 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-2xl border-2 border-white/30 select-none active:bg-white/40 text-white"
+            >←</button>
+            <button 
+                onPointerDown={(e)=>{ e.preventDefault(); touch.current.right=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.right=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.right=false; }}
+                style={{width:'80px',height:'80px'}}
+                className="bg-white/15 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-2xl border-2 border-white/30 select-none active:bg-white/40 text-white"
+            >→</button>
+          </div>
 
-            {/* Högerstyrning: Eld/Hopp/Spin */}
-            <div className="absolute bottom-16 right-6 flex flex-col items-end gap-5 pointer-events-auto">
-                {/* Spin-knappen är mindre och lite högre upp */}
+          {/* Högerstyrning: Eld/Hopp/Spin */}
+          <div className="absolute bottom-8 right-4 flex flex-col items-end gap-3 pointer-events-auto">
+            {/* SPIN – visas tydligt när energi är full */}
+            <button 
+                onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }} 
+                style={{width:'64px',height:'64px'}}
+                className={`rounded-full border-2 font-black transition-all select-none text-xs tracking-widest ${
+                  spinEnergy >= 100 
+                    ? 'bg-yellow-400/70 text-black border-yellow-300 animate-pulse shadow-[0_0_20px_rgba(250,204,21,0.8)]' 
+                    : 'bg-white/5 text-white/30 border-white/10'
+                }`}
+            >SPIN</button>
+            
+            <div className="flex gap-4 items-end">
+                {/* ELD/SKJUT-knapp – stor och tydlig */}
                 <button 
-                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }} 
-                    className={`w-14 h-14 rounded-full border-2 font-black transition-all select-none text-[10px] ${spinEnergy >= 100 ? 'bg-yellow-400/40 text-white border-yellow-400 animate-pulse' : 'bg-white/5 text-white/20 border-white/10'}`}
-                >SPIN</button>
-                
-                <div className="flex gap-5 items-end">
-                    <button 
-                        onPointerDown={(e)=>{ e.preventDefault(); touch.current.fire=true; }}
-                        className="w-22 h-22 bg-red-600/30 backdrop-blur-md rounded-full font-black text-3xl shadow-2xl border-2 border-white/30 active:bg-red-500/50 text-white flex items-center justify-center"
-                    >🔥</button>
-                    <button 
-                        onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
-                        className="w-24 h-24 bg-blue-600/40 backdrop-blur-md rounded-full font-black text-2xl shadow-2xl border-2 border-white/30 active:bg-blue-500/60 text-white flex items-center justify-center uppercase"
-                    >HOPP</button>
-                </div>
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.fire=true; }}
+                    style={{width:'80px',height:'80px'}}
+                    className="bg-red-600/50 backdrop-blur-md rounded-full font-black text-3xl shadow-2xl border-3 border-red-400/60 active:bg-red-500/80 text-white flex items-center justify-center"
+                >🔥</button>
+                {/* HOPP-knapp */}
+                <button 
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
+                    style={{width:'96px',height:'96px'}}
+                    className="bg-blue-600/50 backdrop-blur-md rounded-full font-black text-xl shadow-2xl border-2 border-blue-400/60 active:bg-blue-500/80 text-white flex items-center justify-center uppercase tracking-widest"
+                >HOPP</button>
             </div>
+          </div>
         </div>
       )}
     </div>
