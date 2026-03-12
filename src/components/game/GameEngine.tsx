@@ -20,6 +20,7 @@ interface GameEngineProps {
 
 export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComplete }: GameEngineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
@@ -27,6 +28,7 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
   const [spinEnergy, setSpinEnergy] = useState(0);
   const [displayTime, setDisplayTime] = useState(0);
   const [highScore, setHighScore] = useState(0);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   
   const state = useRef({
     started: false,
@@ -60,15 +62,20 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 1024);
+    
+    const handleInstallPrompt = (e: any) => {
+        e.preventDefault();
+        setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
+
     const lb = getLeaderboard();
     if (lb && lb.length > 0) {
-        const top = lb[0].score;
-        setHighScore(top);
-        state.current.highScore = top;
+        setHighScore(lb[0].score);
+        state.current.highScore = lb[0].score;
     }
 
     const heroFiles = ['kai.png', 'Jay.png', 'zane.png', 'Cole.png', 'Lloyd.png', 'Nya.png', 'overlord.png'];
-    
     heroFiles.forEach(f => {
       const img = new Image();
       img.src = `/${f}`;
@@ -99,16 +106,41 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
 
     return () => { 
         state.current.active = false; 
+        window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
         if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     };
   }, []);
+
+  const handleStartGame = async () => {
+    state.current.started = true;
+    setGameStarted(true);
+    
+    if (isMobile && containerRef.current) {
+      const container = containerRef.current;
+      try {
+        if (container.requestFullscreen) {
+          await container.requestFullscreen();
+        } else if ((container as any).webkitRequestFullscreen) {
+          await (container as any).webkitRequestFullscreen();
+        }
+      } catch (err) {
+        console.warn("Kunde inte gå i fullskärm automatiskt:", err);
+      }
+    }
+  };
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') setDeferredPrompt(null);
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
-
     state.current.active = true;
 
     if (!state.current.initDone) {
@@ -121,9 +153,7 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
             const h = 300 + Math.random() * 200;
             const w = 400 + Math.random() * 800;
             platforms.push({ x: curX, y: h, w, h: 40 }); 
-            if (Math.random() > 0.5) {
-                platforms.push({ x: curX - 100, y: 500, w: 100, h: 60 });
-            }
+            if (Math.random() > 0.5) platforms.push({ x: curX - 100, y: 500, w: 100, h: 60 });
             curX += w + 200 + Math.random() * 400;
         }
         
@@ -131,10 +161,7 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         state.current.enemies = platforms.filter((p,i) => i > 0 && p.w > 200 && Math.random()>0.4).map((p,i) => {
             const enemyX = p.x + 100;
             const mFile = monsterFiles[i % monsterFiles.length];
-            return {
-                x: enemyX, y: p.y - 140, w: 120, h: 140, dx: -1.8, dy: 0, 
-                img: mFile.toLowerCase(), origX: enemyX, range: p.w - 150, onG: true 
-            };
+            return { x: enemyX, y: p.y - 140, w: 120, h: 140, dx: -1.8, dy: 0, img: mFile.toLowerCase(), origX: enemyX, range: p.w - 150, onG: true };
         });
 
         let bossImg = 'overlord';
@@ -144,14 +171,7 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         else if (level.number === 4) bossImg = 'grön demon.png';
         else if (level.number === 5) bossImg = 'lila svart monster.png';
 
-        state.current.boss = { 
-            x: len - 1200, y: 150, w: 420, h: 480, 
-            hp: level.boss.healthMultiplier * 20, 
-            max: level.boss.healthMultiplier * 20, 
-            active: false,
-            img: bossImg.toLowerCase(),
-            attackCd: 120
-        };
+        state.current.boss = { x: len - 1200, y: 150, w: 420, h: 480, hp: level.boss.healthMultiplier * 20, max: level.boss.healthMultiplier * 20, active: false, img: bossImg.toLowerCase(), attackCd: 120 };
         state.current.timeLeft = level.timeLimit;
         state.current.initDone = true;
     }
@@ -196,12 +216,10 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         s.dx *= 0.88; s.dy += 0.8; s.x += s.dx; s.y += s.dy;
 
         let onGround = false;
-        const hitboxPadding = 30;
+        const hbP = 30;
         s.plats.forEach(plat => {
-            if (s.x + hitboxPadding < plat.x + plat.w && s.x + 140 - hitboxPadding > plat.x) {
-                if (s.y + 160 > plat.y && s.y + 160 < plat.y + 60 + Math.max(0, s.dy)) {
-                    s.y = plat.y - 160; s.dy = 0; s.jump = false; onGround = true;
-                }
+            if (s.x + hbP < plat.x + plat.w && s.x + 140 - hbP > plat.x) {
+                if (s.y + 160 > plat.y && s.y + 160 < plat.y + 60 + Math.max(0, s.dy)) { s.y = plat.y - 160; s.dy = 0; s.jump = false; onGround = true; }
             }
         });
 
@@ -213,7 +231,7 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         s.cameraX = Math.max(0, Math.min(s.x - 300, level.length - 800));
         s.energy = Math.min(100, s.energy + 0.2); 
         
-        if ((keys.current['KeyX'] || touch.current.fire) && !s.spin) { s.projs.push({ x: s.fR?s.x+110:s.x+30, y: s.y+80, dx: s.fR?22:-22, c: ninja.color }); keys.current['KeyX'] = false; touch.current.fire = false; }
+        if ((keys.current['KeyX'] || touch.current.fire) && !s.spin) { s.projs.push({ x: s.fR?s.x+110:s.x+30, y: s.y+80, dx: s.fR?22:-22, c: ninja.color });  touch.current.fire = false; }
         if (touch.current.spin && s.energy >= 100) { s.spin = true; s.spinT = 150; s.energy = 0; touch.current.spin = false; }
         if (s.spin) { s.spinT--; s.dx = s.fR ? 17 : -17; if(frames%2===0) s.particles.push({ x: s.x+70+Math.cos(frames*0.5)*100, y: s.y+80+Math.sin(frames*0.5)*100, dx: 0, dy: 0, life: 30, size: 5, color: ninja.color, type: 'vortex' }); if(s.spinT <= 0) s.spin = false; }
 
@@ -230,7 +248,7 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
             if (p.life <= 0) { s.particles.splice(i, 1); return; }
             ctx.fillStyle = p.color;
             if (p.type === 'vortex') { ctx.shadowBlur = 10; ctx.shadowColor = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0; }
-            else { ctx.fillRect(p.x, p.y, p.size, p.size); }
+            else ctx.fillRect(p.x, p.y, p.size, p.size);
         });
 
         s.plats.forEach(plat => {
@@ -257,16 +275,11 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
                 if (e.dx > 0) { ctx.translate(e.x + e.w, e.y); ctx.scale(-1, 1); ctx.drawImage(mImg, 0, 0, e.w, e.h); }
                 else ctx.drawImage(mImg, e.x, e.y, e.w, e.h);
                 ctx.restore();
-                // BORTTAGEN LILA RUTA!
-            } else { 
-                ctx.fillStyle = "#8b5cf6"; ctx.fillRect(e.x, e.y, e.w, e.h);
-            }
+            } else { ctx.fillStyle = "#8b5cf6"; ctx.fillRect(e.x, e.y, e.w, e.h); }
 
             if (s.x < e.x + e.w - 15 && s.x + 140 > e.x + 15 && s.y < e.y + e.h - 15 && s.y + 160 > e.y + 15) {
-                if (s.spin) { 
-                    s.enemies.splice(i, 1); s.score += 100; s.energy = Math.min(100, s.energy + 20); 
-                    for(let k=0; k<12; k++) s.particles.push({ x: e.x+50, y: e.y+60, dx: (Math.random()-0.5)*12, dy: (Math.random()-0.5)*12, life: 40, size: 5, color: '#ffcc00', type: 'spark' }); 
-                } else { s.active = false; onGameOver(s.score); }
+                if (s.spin) { s.enemies.splice(i, 1); s.score += 100; s.energy = Math.min(100, s.energy + 20); for(let k=0; k<12; k++) s.particles.push({ x: e.x+50, y: e.y+60, dx: (Math.random()-0.5)*12, dy: (Math.random()-0.5)*12, life: 40, size: 5, color: '#ffcc00', type: 'spark' }); }
+                else { s.active = false; onGameOver(s.score); }
             }
         });
 
@@ -281,38 +294,24 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
             if (pr.x > s.boss.x && pr.x < s.boss.x + s.boss.w && pr.y > s.boss.y && pr.y < s.boss.y + s.boss.h) { s.boss.hp--; s.projs.splice(i, 1); if (s.boss.hp <= 0) { s.active = false; onLevelComplete(s.score + level.bossPoints + (s.timeLeft * 50)); } }
         });
 
-        // BOSS ATTACK LOGIC & PROJECTILES
         if (s.x > level.length - 3000) {
             s.boss.attackCd--;
             if (s.boss.attackCd <= 0) {
-                const bX = s.boss.x + s.boss.w/2;
-                const bY = s.boss.y + s.boss.h/2;
-                const targetX = s.x + 70;
-                const targetY = s.y + 80;
-                const angle = Math.atan2(targetY - bY, targetX - bX);
-                
-                // Diff skalar med nivå (1 = lättast, 6 = svårast)
-                const speed = 6 + level.number * 1.5;
-                const color = level.number === 1 ? '#ff4400' : level.number === 6 ? '#8b5cf6' : '#00ffcc';
-                
+                const bX = s.boss.x + s.boss.w/2, bY = s.boss.y + s.boss.h/2;
+                const angle = Math.atan2((s.y + 80) - bY, (s.x + 70) - bX);
+                const speed = 6 + level.number * 1.5, color = level.number === 1 ? '#ff4400' : level.number === 6 ? '#8b5cf6' : '#00ffcc';
                 s.bossProjs.push({ x: bX, y: bY, dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed, c: color, r: 25 + level.number * 5 });
-                s.boss.attackCd = Math.max(30, 180 - level.number * 25); // Tätare attacker vid högre nivå
-                
-                // Partiklar vid avfyring
+                s.boss.attackCd = Math.max(30, 180 - level.number * 25);
                 for(let k=0; k<10; k++) s.particles.push({ x: bX, y: bY, dx: (Math.random()-0.5)*10, dy: (Math.random()-0.5)*10, life: 20, size: 4, color: color, type: 'spark' });
             }
         }
 
         s.bossProjs.forEach((bp, i) => {
             bp.x += bp.dx; bp.y += bp.dy;
-            const bpGrad = ctx.createRadialGradient(bp.x, bp.y, 0, bp.x, bp.y, bp.r);
-            bpGrad.addColorStop(0, 'white'); bpGrad.addColorStop(0.4, bp.c); bpGrad.addColorStop(1, 'transparent');
-            ctx.fillStyle = bpGrad; ctx.beginPath(); ctx.arc(bp.x, bp.y, bp.r, 0, Math.PI*2); ctx.fill();
-            
-            // Ninja Hit Test
-            const dist = Math.hypot(bp.x - (s.x + 70), bp.y - (s.y + 80));
-            if (dist < bp.r + 40 && !s.spin) { s.active = false; onGameOver(s.score); }
-            
+            const bpG = ctx.createRadialGradient(bp.x, bp.y, 0, bp.x, bp.y, bp.r);
+            bpG.addColorStop(0, 'white'); bpG.addColorStop(0.4, bp.c); bpG.addColorStop(1, 'transparent');
+            ctx.fillStyle = bpG; ctx.beginPath(); ctx.arc(bp.x, bp.y, bp.r, 0, Math.PI*2); ctx.fill();
+            if (Math.hypot(bp.x - (s.x + 70), bp.y - (s.y + 80)) < bp.r + 40 && !s.spin) { s.active = false; onGameOver(s.score); }
             if (bp.x < s.cameraX - 100 || bp.x > s.cameraX + 900 || bp.y < -100 || bp.y > 700) s.bossProjs.splice(i, 1);
         });
 
@@ -322,7 +321,7 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         else { ctx.fillStyle = ninja.color; ctx.fillRect(-70, -80, 140, 160); }
         ctx.restore();
 
-        if (s.spin) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const sGrad = ctx.createRadialGradient(s.x+70, s.y+80, 0, s.x+70, s.y+80, 140); sGrad.addColorStop(0, 'white'); sGrad.addColorStop(0.5, ninja.color); sGrad.addColorStop(1, 'transparent'); ctx.fillStyle = sGrad; ctx.beginPath(); ctx.arc(s.x+70, s.y+80, 140, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+        if (s.spin) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const sG = ctx.createRadialGradient(s.x+70, s.y+80, 0, s.x+70, s.y+80, 140); sG.addColorStop(0, 'white'); sG.addColorStop(0.5, ninja.color); sG.addColorStop(1, 'transparent'); ctx.fillStyle = sG; ctx.beginPath(); ctx.arc(s.x+70, s.y+80, 140, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
         
         if (s.x > level.length - 2500) {
             const bImg = images.current[s.boss.img];
@@ -340,90 +339,83 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
     };
 
     raf = requestAnimationFrame(loop);
-    return () => { cancelAnimationFrame(raf); };
+    return () => cancelAnimationFrame(raf);
   }, [gameStarted]);
 
   return (
-    <div className="relative w-full aspect-video bg-black overflow-hidden rounded-3xl border-4 border-white/10 shadow-2xl">
+    <div 
+        ref={containerRef}
+        className={`relative w-full overflow-hidden bg-black select-none touch-none ${isMobile ? 'fixed inset-0 z-[10000] h-[100dvh]' : 'aspect-video rounded-3xl border-4 border-white/10 shadow-2xl'}`}
+        style={{ "-webkit-user-select": "none", "-webkit-touch-callout": "none" } as any}
+    >
       <canvas ref={canvasRef} width={800} height={600} className="w-full h-full object-contain" />
       
       {!gameStarted && (
         <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-black/85 backdrop-blur-3xl px-12 text-center text-white">
-            <div className="w-32 h-32 bg-white/10 rounded-full mb-6 p-4 border border-white/20 animate-pulse overflow-hidden">
+            <div className={`bg-white/10 rounded-full mb-6 p-4 border border-white/20 animate-pulse overflow-hidden ${isMobile ? 'w-20 h-20' : 'w-32 h-32'}`}>
                 <img src="/icon.png" className="w-full h-full object-cover rounded-full" alt="Ninjago" />
             </div>
-            <h2 className="text-6xl font-black italic mb-2 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500">BANA {level.number}</h2>
-            <h3 className="text-4xl font-bold text-white uppercase mb-4 tracking-widest">{level.name}</h3>
-            <p className="max-w-md text-white/50 mb-10 text-xl font-medium leading-relaxed italic">"{level.description}"</p>
-            <button 
-                onPointerDown={() => { state.current.started = true; setGameStarted(true); }}
-                className="group relative px-20 py-10 bg-gradient-to-br from-red-600 to-red-800 text-white text-5xl font-black rounded-[2.5rem] shadow-[0_20px_60px_rgba(255,0,0,0.6)] border-b-[16px] border-red-950 active:border-0 active:translate-y-4 transition-all duration-75"
-            >
-                STARTA STRIDEN!
-            </button>
+            <h2 className={`${isMobile ? 'text-3xl' : 'text-6xl'} font-black italic mb-2 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 uppercase`}>BANA {level.number}</h2>
+            <h3 className={`${isMobile ? 'text-xl' : 'text-4xl'} font-bold text-white uppercase mb-4 tracking-widest`}>{level.name}</h3>
+            
+            <div className="flex flex-col gap-4 items-center">
+                <button onPointerDown={handleStartGame} className={`group relative bg-gradient-to-br from-red-600 to-red-800 text-white font-black rounded-[2rem] shadow-[0_15px_40px_rgba(255,0,0,0.5)] border-b-[12px] border-red-950 active:border-0 active:translate-y-2 transition-all duration-75 ${isMobile ? 'px-8 py-4 text-2xl' : 'px-20 py-10 text-5xl'}`}>STARTA STRIDEN!</button>
+                {deferredPrompt && <button onPointerDown={handleInstallClick} className="px-6 py-2 bg-white/5 hover:bg-white/10 backdrop-blur-md rounded-lg border border-white/10 text-white font-bold text-sm animate-bounce mt-2">📲 INSTALLERA SNABBT</button>}
+            </div>
         </div>
       )}
 
       {gameStarted && (
-        <>
-            <div className="absolute top-4 inset-x-6 z-[200] flex justify-between items-start pointer-events-none">
-                <div className="flex flex-col gap-2">
-                    <div className="px-6 py-3 bg-black/60 backdrop-blur-md rounded-2xl border border-white/20 text-white font-black text-3xl shadow-2xl flex items-center gap-4">
-                        <div className="w-4 h-4 rounded-full bg-red-500 animate-ping" />
-                        {currentScore}
-                    </div>
-                    <div className="px-4 py-1 bg-yellow-500/20 backdrop-blur-sm rounded-xl border border-yellow-500/40 text-yellow-500 font-bold text-sm tracking-widest uppercase">
-                        REKORD: {highScore}
-                    </div>
-                </div>
-                
-                <div className="absolute left-1/2 -translate-x-1/2 top-4 flex flex-col items-center gap-1">
-                    <div className="text-[10px] font-black text-white/40 tracking-[0.3em] uppercase">Spinjitzu (Z)</div>
-                    <div className="w-48 h-5 bg-black/50 rounded-full border border-white/20 overflow-hidden backdrop-blur-md shadow-inner relative">
-                        <div 
-                            className={`h-full transition-all duration-300 ${spinEnergy >= 100 ? 'bg-yellow-400 shadow-[0_0_20px_yellow]' : 'bg-blue-500'}`} 
-                            style={{ width: `${spinEnergy}%` }} 
-                        />
-                        {spinEnergy >= 100 && <div className="absolute inset-0 animate-pulse bg-white/20" />}
-                    </div>
-                </div>
-
-                <div className="flex flex-col items-end gap-2 text-right">
-                    <div className={`px-6 py-3 bg-black/60 backdrop-blur-md rounded-2xl border ${displayTime < 30 ? 'border-red-500 text-red-500 animate-pulse' : 'border-white/20 text-white'} font-black text-3xl shadow-2xl`}>
-                        TID: {displayTime}s
-                    </div>
+        <div className="absolute top-4 inset-x-4 z-[200] flex justify-between items-start pointer-events-none">
+            <div className={`px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/10 text-white font-black shadow-xl flex items-center gap-2 ${isMobile ? 'text-lg' : 'text-3xl'}`}>
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" /> {currentScore}
+            </div>
+            
+            <div className="absolute left-1/2 -translate-x-1/2 top-2 flex flex-col items-center gap-0.5">
+                <div className="text-[8px] font-black text-white/30 tracking-[0.2em] uppercase">Spinjitzu (Z)</div>
+                <div className={`${isMobile ? 'w-24 h-2.5' : 'w-48 h-5'} bg-black/40 rounded-full border border-white/10 overflow-hidden relative`}>
+                    <div className={`h-full transition-all duration-300 ${spinEnergy >= 100 ? 'bg-yellow-400' : 'bg-blue-500'}`} style={{ width: `${spinEnergy}%` }} />
                 </div>
             </div>
-        </>
+
+            <div className={`px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border ${displayTime < 30 ? 'border-red-500 text-red-500' : 'border-white/10 text-white'} font-black shadow-xl ${isMobile ? 'text-lg' : 'text-3xl'}`}>
+                {displayTime}s
+            </div>
+        </div>
       )}
 
       {gameStarted && isMobile && (
-        <div className="absolute inset-x-0 bottom-0 top-0 z-[200] pointer-events-none p-6">
-             <div className="absolute bottom-8 left-8 flex gap-6 pointer-events-auto">
+        <div className="absolute inset-0 z-[200] pointer-events-none px-4 pb-4">
+             {/* Vänsterstyrning: Vänster/Höger pilar */}
+             <div className="absolute bottom-4 left-4 flex gap-2 pointer-events-auto">
                 <button 
-                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.left=true; }} 
-                    onPointerUp={(e)=>{ e.preventDefault(); touch.current.left=false; }} 
-                    onPointerLeave={(e)=>{ e.preventDefault(); touch.current.left=false; }}
-                    className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-6xl shadow-2xl border border-white/20 select-none active:bg-white/30 transition-all font-black text-white"
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.left=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.left=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.left=false; }}
+                    className="w-16 h-16 bg-white/5 backdrop-blur-sm rounded-2xl flex items-center justify-center text-4xl shadow-xl border-2 border-white/10 select-none active:bg-white/20 text-white"
                 >←</button>
                 <button 
-                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.right=true; }} 
-                    onPointerUp={(e)=>{ e.preventDefault(); touch.current.right=false; }} 
-                    onPointerLeave={(e)=>{ e.preventDefault(); touch.current.right=false; }}
-                    className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-6xl shadow-2xl border border-white/20 select-none active:bg-white/30 transition-all font-black text-white"
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.right=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.right=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.right=false; }}
+                    className="w-16 h-16 bg-white/5 backdrop-blur-sm rounded-2xl flex items-center justify-center text-4xl shadow-xl border-2 border-white/10 select-none active:bg-white/20 text-white"
                 >→</button>
             </div>
-            <div className="absolute bottom-8 right-8 flex items-end gap-5 pointer-events-auto">
+
+            {/* Högerstyrning: Eld/Hopp/Spin */}
+            <div className="absolute bottom-4 right-4 flex flex-col items-end gap-3 pointer-events-auto">
+                {/* Spin-knappen är mindre och lite högre upp */}
                 <button 
                     onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }} 
-                    className={`w-18 h-18 rounded-full border-4 font-black mt-2 text-xs transition-all select-none ${spinEnergy >= 100 ? 'bg-yellow-400 text-black border-white shadow-[0_0_30px_rgba(255,255,255,0.8)] scale-110' : 'bg-white/5 text-white/10 border-white/5'}`}
+                    className={`w-12 h-12 rounded-full border-2 font-black transition-all select-none text-[10px] ${spinEnergy >= 100 ? 'bg-yellow-400/30 text-white border-yellow-400 animate-pulse' : 'bg-white/5 text-white/20 border-white/10'}`}
                 >SPIN</button>
-                <button 
-                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} 
-                    onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} 
-                    onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
-                    className="w-28 h-28 bg-blue-600/40 backdrop-blur-xl rounded-full font-black text-3xl shadow-2xl border-4 border-white/30 active:scale-90 transition-all select-none text-white"
-                >HOPP</button>
+                
+                <div className="flex gap-4 items-end">
+                    <button 
+                        onPointerDown={(e)=>{ e.preventDefault(); touch.current.fire=true; }}
+                        className="w-18 h-18 bg-red-600/20 backdrop-blur-sm rounded-full font-black text-2xl shadow-xl border-2 border-white/20 active:bg-red-500/40 text-white flex items-center justify-center"
+                    >🔥</button>
+                    <button 
+                        onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
+                        className="w-22 h-22 bg-blue-600/30 backdrop-blur-sm rounded-full font-black text-2xl shadow-xl border-2 border-white/20 active:bg-blue-500/50 text-white flex items-center justify-center"
+                    >HOPP</button>
+                </div>
             </div>
         </div>
       )}

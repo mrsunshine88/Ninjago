@@ -1,19 +1,18 @@
-const CACHE_NAME = 'ninjago-v1';
+const CACHE_NAME = 'ninjago-v2';
 const ASSETS = [
   '/',
-  '/index.html',
   '/manifest.json',
-  '/sprite.png',
-  '/audio/ninjago_menu_music_8bit.wav',
-  '/audio/ninjago_battle_music_8bit.wav',
-  '/audio/sfx_lightning_8bit.wav',
-  '/audio/sfx_spinjitzu_8bit.wav'
+  '/icon.png',
+  '/audio/ninjago_menu_music_8bit.wav'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
+      // Vi använder en loop för att inte hela installationen ska krascha om en fil saknas
+      return Promise.allSettled(
+        ASSETS.map(url => cache.add(url))
+      );
     })
   );
 });
@@ -22,6 +21,17 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((response) => {
       return response || fetch(event.request);
+    })
+  );
+});
+
+// Ta bort gamla cacher
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+      );
     })
   );
 });
