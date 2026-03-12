@@ -496,6 +496,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                 coin.collected = true;
                 s.score += 50;
                 s.lastReportedScore = s.score;
+                if (typeof window !== 'undefined') localStorage.setItem('ninjago_emergency_score', String(s.score));
                 setCurrentScore(s.score);
                 s.scorePopups.push({ x: coin.x, y: coin.y, text: "+50", life: 60 });
                 playSFX('sfx_lightning_8bit.wav', 0.2);
@@ -625,6 +626,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                     const bonus = s.combo > 1 ? s.combo * 50 : 0;
                     s.score += 100 + bonus;
                     s.lastReportedScore = s.score; // Sync ref
+                    if (typeof window !== 'undefined') localStorage.setItem('ninjago_emergency_score', String(s.score));
                     if (s.combo > 1) {
                         s.comboTextVal = s.combo;
                         s.comboTextLife = 90;
@@ -652,8 +654,11 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                     s.combo = 0; // Reset combo vid skada
                     if (s.lives <= 0) {
                         s.active = false;
-                        const finalS = Math.max(Number(s.score) || 0, s.lastReportedScore || 0);
-                        console.log(`[v1.46] Game Over. Score: ${finalS}`);
+                        let finalScoreBackup = 0;
+                        if (typeof window !== 'undefined') finalScoreBackup = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
+                        const finalS = Math.max(Number(s.score) || 0, s.lastReportedScore || 0, finalScoreBackup);
+                        console.log(`[v1.47] Game Over. Final Score: ${finalS}`);
+                        if (typeof window !== 'undefined') localStorage.removeItem('ninjago_emergency_score');
                         setCurrentScore(finalS);
                         setTimeout(() => onGameOverRef.current(finalS), 1500);
                     } else {
@@ -742,8 +747,11 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                     s.shake = 12; s.combo = 0;
                     if (s.lives <= 0) {
                         s.active = false;
-                        const finalS = Math.max(Number(s.score) || 0, s.lastReportedScore || 0);
-                        console.log(`[v1.46] Game Over. Score: ${finalS}`);
+                        let finalScoreBackup = 0;
+                        if (typeof window !== 'undefined') finalScoreBackup = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
+                        const finalS = Math.max(Number(s.score) || 0, s.lastReportedScore || 0, finalScoreBackup);
+                        console.log(`[v1.47] Game Over. Final Score: ${finalS}`);
+                        if (typeof window !== 'undefined') localStorage.removeItem('ninjago_emergency_score');
                         setCurrentScore(finalS);
                         setTimeout(() => onGameOverRef.current(finalS), 1500);
                     } else {
@@ -997,29 +1005,31 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
             >→</button>
           </div>
 
-          {/* Högerstyrning: Eld/Hopp/Spin - Flyttade längre ut och ändrade layout för portrait */}
-          <div className="absolute bottom-4 right-2 flex items-end gap-1 pointer-events-auto">
-            {/* SPIN – liten och rund */}
-            <button 
-                onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }} 
-                style={{width:'48px',height:'48px'}}
-                className={`rounded-full border-2 font-black transition-all select-none text-[7px] tracking-widest ${
-                  spinEnergy >= 100 
-                    ? 'bg-yellow-400/90 text-black border-yellow-200 animate-pulse shadow-[0_0_20px_rgba(250,204,21,0.8)]' 
-                    : 'bg-white/5 text-white/30 border-white/10'
-                }`}
-            >SPIN</button>
-            
-            <button 
-                onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
-                style={{width:'76px',height:'76px'}}
-                className="bg-blue-600/60 backdrop-blur-md rounded-full font-black text-[10px] shadow-2xl border-2 border-blue-400/50 active:bg-blue-500/80 text-white flex items-center justify-center uppercase tracking-widest"
-            >HOPP</button>
+          {/* Högerstyrning: Eld/Hopp/Spin - Flyttade SPIN ovanför hopp */}
+          <div className="absolute bottom-4 right-2 flex items-end gap-2 pointer-events-auto">
+            <div className="flex flex-col items-center gap-2">
+                {/* SPIN – flyttad ovanför hopp */}
+                <button 
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }} 
+                    style={{width:'54px',height:'54px'}}
+                    className={`rounded-full border-2 font-black transition-all select-none text-[8px] tracking-widest flex items-center justify-center ${
+                    spinEnergy >= 100 
+                        ? 'bg-yellow-400/90 text-black border-yellow-200 animate-pulse shadow-[0_0_20px_rgba(250,204,21,0.8)]' 
+                        : 'bg-white/5 text-white/30 border-white/10'
+                    }`}
+                >SPIN</button>
+                
+                <button 
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
+                    style={{width:'82px',height:'82px'}}
+                    className="bg-blue-600/60 backdrop-blur-md rounded-full font-black text-[12px] shadow-2xl border-2 border-blue-400/50 active:bg-blue-500/80 text-white flex items-center justify-center uppercase tracking-widest mb-1"
+                >HOPP</button>
+            </div>
             
             <button 
                 onPointerDown={(e)=>{ e.preventDefault(); touch.current.fire=true; }}
-                style={{width:'84px',height:'84px'}}
-                className="bg-red-600/60 backdrop-blur-md rounded-full font-black text-2xl shadow-2xl border-2 border-red-400/50 active:bg-red-500/80 text-white flex items-center justify-center ml-2"
+                style={{width:'90px',height:'90px'}}
+                className="bg-red-600/60 backdrop-blur-md rounded-full font-black text-3xl shadow-2xl border-2 border-red-400/50 active:bg-red-500/80 text-white flex items-center justify-center ml-1 mb-1"
             >🔥</button>
           </div>
         </div>

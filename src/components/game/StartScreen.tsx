@@ -273,7 +273,7 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
 
       {/* Version Tag - v1.39, nedre vänster */}
       <div className="absolute bottom-4 left-4 text-white/50 text-[12px] font-black uppercase tracking-[0.2em] z-50 pointer-events-none select-none italic">
-        v1.46
+        v1.47
       </div>
 
       {/* Credit Text - alltid centrerat längst ned, krockar ej med version */}
