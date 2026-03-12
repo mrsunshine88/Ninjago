@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ninjago-v3';
+const CACHE_NAME = 'ninjago-v4';
 const ASSETS = [
   '/',
   '/manifest.json',

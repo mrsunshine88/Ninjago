@@ -24,6 +24,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="apple-touch-icon" href="/LNERI2019.jpg" />
+        <link rel="icon" type="image/jpeg" href="/LNERI2019.jpg" />
         <meta name="theme-color" content="#EF4444" />
         <script dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator) {

@@ -152,13 +152,16 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         platforms.push({ x: 0, y: 560, w: len, h: 200 }); 
         
         let curX = 1200;
-        while (curX < len - 3000) {
+        while (curX < len - 1000) { // Förläng plattformar ända fram till bossområdet
             const h = 300 + Math.random() * 200;
             const w = 400 + Math.random() * 800;
             platforms.push({ x: curX, y: h, w, h: 40 }); 
             if (Math.random() > 0.5) platforms.push({ x: curX - 100, y: 500, w: 100, h: 60 });
             curX += w + 200 + Math.random() * 400;
         }
+        
+        // Garantera en arena-plattform vid bossen
+        platforms.push({ x: len - 1500, y: 500, w: 1500, h: 100 });
         
         state.current.plats = platforms;
         
@@ -317,6 +320,8 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
             const mImg = images.current[e.img];
             if (mImg?.complete && mImg.naturalWidth > 0) {
                 ctx.save();
+                // Lägg till ett filter för att minska vita kanter (ljusa partier)
+                ctx.filter = 'contrast(1.1) brightness(0.95)'; 
                 if (e.dx > 0) { ctx.translate(e.x + e.w, e.y); ctx.scale(-1, 1); ctx.drawImage(mImg, 0, 0, e.w, e.h); }
                 else ctx.drawImage(mImg, e.x, e.y, e.w, e.h);
                 ctx.restore();
@@ -344,8 +349,19 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
             if (s.boss.attackCd <= 0) {
                 const bX = s.boss.x + s.boss.w/2, bY = s.boss.y + s.boss.h/2;
                 const angle = Math.atan2((s.y + 80) - bY, (s.x + 70) - bX);
-                const speed = 6 + level.number * 1.5, color = level.number === 1 ? '#ff4400' : level.number === 6 ? '#8b5cf6' : '#00ffcc';
-                s.bossProjs.push({ x: bX, y: bY, dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed, c: color, r: 25 + level.number * 5 });
+                
+                // Unika attacker baserat på nivå
+                let speed = 6 + level.number * 1.5;
+                let color = '#ff4400'; // Default röd (Eld)
+                let type: any = 'fire';
+                
+                if (level.number === 2) { color = '#00ccff'; type = 'ice'; speed = 5; } // Is-skott
+                else if (level.number === 3) { color = '#ffaa00'; speed = 9; } // Snabb eld
+                else if (level.number === 4) { color = '#eeff00'; type = 'lightning'; } // Blixt
+                else if (level.number === 5) { color = '#8800ff'; type = 'void'; } // Mörker
+                else if (level.number === 6) { color = '#ff0000'; type = 'void'; speed = 11; } // Overlord blixtar
+                
+                s.bossProjs.push({ x: bX, y: bY, dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed, c: color, r: 25 + level.number * 5, type });
                 s.boss.attackCd = Math.max(30, 180 - level.number * 25);
                 for(let k=0; k<10; k++) s.particles.push({ x: bX, y: bY, dx: (Math.random()-0.5)*10, dy: (Math.random()-0.5)*10, life: 20, size: 4, color: color, type: 'spark' });
             }
@@ -356,7 +372,13 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
             const bpG = ctx.createRadialGradient(bp.x, bp.y, 0, bp.x, bp.y, bp.r);
             bpG.addColorStop(0, 'white'); bpG.addColorStop(0.4, bp.c); bpG.addColorStop(1, 'transparent');
             ctx.fillStyle = bpG; ctx.beginPath(); ctx.arc(bp.x, bp.y, bp.r, 0, Math.PI*2); ctx.fill();
-            if (Math.hypot(bp.x - (s.x + 70), bp.y - (s.y + 80)) < bp.r + 40 && !s.spin) { s.active = false; onGameOver(s.score); }
+            
+            if (Math.hypot(bp.x - (s.x + 70), bp.y - (s.y + 80)) < bp.r + 40 && !s.spin) { 
+                // Is-skott saktar ner spelaren
+                if (bp.type === 'ice') { s.dx *= 0.3; }
+                else { s.active = false; onGameOver(s.score); }
+                s.bossProjs.splice(i, 1);
+            }
             if (bp.x < s.cameraX - 100 || bp.x > s.cameraX + 900 || bp.y < -100 || bp.y > 700) s.bossProjs.splice(i, 1);
         });
 

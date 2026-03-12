@@ -181,9 +181,9 @@ export function StartScreen({ onStart, scores }: StartScreenProps) {
         </div>
       </div>
 
-      {/* Credit Text */}
+      {/* Credit Text - Mer kompakt på mobil för att undvika överlapp */}
       <div 
-        className="absolute bottom-5 right-5 text-[#FFD700] text-[14px] md:text-[16px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] z-50 pointer-events-none select-none"
+        className={`absolute bottom-5 ${isAdminMode ? 'right-5' : 'left-1/2 -translate-x-1/2 lg:left-auto lg:translate-x-0 lg:right-5'} text-[#FFD700] text-[12px] md:text-[16px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] z-50 pointer-events-none select-none text-center whitespace-nowrap`}
       >
         Game Idea & Design by Lukas Persson
       </div>
