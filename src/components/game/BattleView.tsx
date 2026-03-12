@@ -21,13 +21,13 @@ export function BattleView({ ninja, level, playerName, onNext, onGameOver, onAbo
       <div className="w-full flex justify-between items-center bg-card/60 p-4 rounded-xl border border-primary/30 backdrop-blur-xl shadow-2xl">
         <div className="flex flex-col">
           <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.2em]">Nivå</span>
-          <span className="text-3xl font-black text-primary italic leading-none">{level.number} / 6</span>
+          <span className="text-3xl font-black text-primary italic leading-none">{(level?.number || 1)} / 6</span>
         </div>
         
         <div className="text-center hidden md:block">
           <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.2em]">Nuvarande Ninja</span>
           <div className="text-xl font-black text-accent italic flex items-center gap-2 drop-shadow-sm">
-            <Sword className="w-5 h-5" /> {playerName} ({ninja.name})
+            <Sword className="w-5 h-5" /> {playerName || 'Ninja'} ({ninja?.name || 'Kai'})
           </div>
         </div>
 
@@ -35,7 +35,7 @@ export function BattleView({ ninja, level, playerName, onNext, onGameOver, onAbo
           <div className="flex flex-col items-end hidden lg:flex">
             <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.2em]">Element</span>
             <span className="text-xl font-black text-white uppercase flex items-center gap-1 italic">
-              <Zap className="w-5 h-5 text-accent" /> {ninja.power}
+              <Zap className="w-5 h-5 text-accent" /> {ninja?.power || 'Energi'}
             </span>
           </div>
           
@@ -50,7 +50,7 @@ export function BattleView({ ninja, level, playerName, onNext, onGameOver, onAbo
         </div>
       </div>
 
-      <Progress value={(level.number / 6) * 100} className="h-3 w-full bg-primary/10" />
+      <Progress value={((level?.number || 1) / 6) * 100} className="h-3 w-full bg-primary/10" />
 
       <div className="relative w-full aspect-video md:aspect-[16/9] max-h-[70vh] shadow-[0_0_50px_rgba(0,0,0,0.5)]">
         <GameEngine 
@@ -69,7 +69,7 @@ export function BattleView({ ninja, level, playerName, onNext, onGameOver, onAbo
           </div>
           <div>
             <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Ditt Uppdrag</div>
-            <div className="text-sm font-bold text-white italic">{level.boss.description}</div>
+            <div className="text-sm font-bold text-white italic">{level?.boss?.description || 'Besegra fienden!'}</div>
           </div>
         </div>
         <div className="bg-card/40 p-5 rounded-2xl border border-white/5 flex items-center gap-4 hover:bg-card/60 transition-colors">
@@ -87,7 +87,7 @@ export function BattleView({ ninja, level, playerName, onNext, onGameOver, onAbo
           </div>
           <div>
             <div className="text-[10px] text-green-500 uppercase font-bold tracking-widest">Status</div>
-            <div className="text-sm font-bold text-white italic">Besegra {level.boss.name} för att nå nästa bana!</div>
+            <div className="text-sm font-bold text-white italic">Besegra {level?.boss?.name || 'bossen'} för att nå nästa bana!</div>
           </div>
         </div>
       </div>

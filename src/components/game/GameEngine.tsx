@@ -63,6 +63,9 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
   useEffect(() => {
     setIsMobile(window.innerWidth < 1024);
     
+    // Reset initialization when level or ninja changes
+    state.current.initDone = false;
+
     const handleInstallPrompt = (e: any) => {
         e.preventDefault();
         setDeferredPrompt(e);
@@ -109,7 +112,7 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
         if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     };
-  }, []);
+  }, [level, ninja]);
 
   const handleStartGame = async () => {
     state.current.started = true;
@@ -144,7 +147,7 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
     state.current.active = true;
 
     if (!state.current.initDone) {
-        const len = level.length;
+        const len = level?.length || 8000;
         const platforms: any[] = [];
         platforms.push({ x: 0, y: 560, w: len, h: 200 }); 
         
@@ -158,21 +161,52 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         }
         
         state.current.plats = platforms;
-        state.current.enemies = platforms.filter((p,i) => i > 0 && p.w > 200 && Math.random()>0.4).map((p,i) => {
-            const enemyX = p.x + 100;
-            const mFile = monsterFiles[i % monsterFiles.length];
-            return { x: enemyX, y: p.y - 140, w: 120, h: 140, dx: -1.8, dy: 0, img: mFile.toLowerCase(), origX: enemyX, range: p.w - 150, onG: true };
+        
+        // Smart fiendegenerering: Slumpmässigt antal och olika typer
+        const enemies: any[] = [];
+        platforms.forEach((p, i) => {
+            if (i === 0 || p.w < 200) return;
+            
+            // Fler fiender och högre chans på högre svårighetsgrader
+            const maxE = Math.min(3, 1 + Math.floor(level.difficulty / 2));
+            const count = Math.floor(Math.random() * maxE) + 1;
+            
+            for (let j = 0; j < count; j++) {
+                // Tröskeln minskar med svårighetsgraden (lägre tröskel = fler fiender)
+                const spawnThreshold = 0.6 - (level.difficulty * 0.08); 
+                if (Math.random() > spawnThreshold) {
+                    const offset = (p.w / (count + 1)) * (j + 1);
+                    const enemyX = p.x + offset;
+                    const mFile = monsterFiles[Math.floor(Math.random() * monsterFiles.length)];
+                    enemies.push({ 
+                        x: enemyX, 
+                        y: p.y - 140, 
+                        w: 120, 
+                        h: 140, 
+                        dx: (level.number === 1 ? -1.2 : -1.8 - (level.difficulty * 0.2)), 
+                        dy: 0, 
+                        img: mFile.toLowerCase(), 
+                        origX: enemyX, 
+                        range: p.w / count, 
+                        onG: true 
+                    });
+                }
+            }
         });
+        state.current.enemies = enemies;
 
-        let bossImg = 'overlord';
+        let bossImg = 'overlord.png';
         if (level.number === 1) bossImg = 'stor drake.png';
         else if (level.number === 2) bossImg = 'lila svart stor orm.png';
         else if (level.number === 3) bossImg = 'storm arg orm.png';
         else if (level.number === 4) bossImg = 'grön demon.png';
         else if (level.number === 5) bossImg = 'lila svart monster.png';
+        else if (level.number === 6 && !images.current['overlord']) bossImg = 'fiender ond.png'; // Fallback om bilden saknas
 
-        state.current.boss = { x: len - 1200, y: 150, w: 420, h: 480, hp: level.boss.healthMultiplier * 20, max: level.boss.healthMultiplier * 20, active: false, img: bossImg.toLowerCase(), attackCd: 120 };
-        state.current.timeLeft = level.timeLimit;
+        // Bossens HP: Skalar upp men med ett tak på 150 för att det inte ska bli segt
+        const bossHP = Math.min(150, (level.boss?.healthMultiplier || 1) * 15);
+        state.current.boss = { x: len - 1200, y: 150, w: 420, h: 480, hp: bossHP, max: bossHP, active: false, img: bossImg.toLowerCase(), attackCd: 120 };
+        state.current.timeLeft = level?.timeLimit || 120;
         state.current.initDone = true;
     }
   }, [level, ninja]);
@@ -219,7 +253,18 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
         const hbP = 30;
         s.plats.forEach(plat => {
             if (s.x + hbP < plat.x + plat.w && s.x + 140 - hbP > plat.x) {
-                if (s.y + 160 > plat.y && s.y + 160 < plat.y + 60 + Math.max(0, s.dy)) { s.y = plat.y - 160; s.dy = 0; s.jump = false; onGround = true; }
+                // Ground collision
+                if (s.y + 160 > plat.y && s.y + 160 < plat.y + 60 + Math.max(0, s.dy)) { 
+                    s.y = plat.y - 160; 
+                    s.dy = 0; 
+                    s.jump = false; 
+                    onGround = true; 
+                }
+                // Ceiling collision: Om du hoppar upp i en plattform
+                else if (s.dy < 0 && s.y > plat.y + plat.h - 20 && s.y < plat.y + plat.h + 20) {
+                    s.y = plat.y + plat.h + 2;
+                    s.dy = 0.5; // Stoppa uppåtfarten och börja falla
+                }
             }
         });
 
@@ -277,7 +322,7 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
                 ctx.restore();
             } else { ctx.fillStyle = "#8b5cf6"; ctx.fillRect(e.x, e.y, e.w, e.h); }
 
-            if (s.x < e.x + e.w - 15 && s.x + 140 > e.x + 15 && s.y < e.y + e.h - 15 && s.y + 160 > e.y + 15) {
+            if (s.x < e.x + e.w - 25 && s.x + 140 > e.x + 25 && s.y < e.y + e.h - 35 && s.y + 140 > e.y + 15) {
                 if (s.spin) { s.enemies.splice(i, 1); s.score += 100; s.energy = Math.min(100, s.energy + 20); for(let k=0; k<12; k++) s.particles.push({ x: e.x+50, y: e.y+60, dx: (Math.random()-0.5)*12, dy: (Math.random()-0.5)*12, life: 40, size: 5, color: '#ffcc00', type: 'spark' }); }
                 else { s.active = false; onGameOver(s.score); }
             }
@@ -385,35 +430,35 @@ export function GameEngine({ ninja, level, playerName, onGameOver, onLevelComple
       )}
 
       {gameStarted && isMobile && (
-        <div className="absolute inset-0 z-[200] pointer-events-none px-4 pb-4">
+        <div className="absolute inset-0 z-[200] pointer-events-none px-4 pb-12 md:pb-4">
              {/* Vänsterstyrning: Vänster/Höger pilar */}
-             <div className="absolute bottom-4 left-4 flex gap-2 pointer-events-auto">
+             <div className="absolute bottom-16 left-6 flex gap-4 pointer-events-auto">
                 <button 
                     onPointerDown={(e)=>{ e.preventDefault(); touch.current.left=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.left=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.left=false; }}
-                    className="w-16 h-16 bg-white/5 backdrop-blur-sm rounded-2xl flex items-center justify-center text-4xl shadow-xl border-2 border-white/10 select-none active:bg-white/20 text-white"
+                    className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white"
                 >←</button>
                 <button 
                     onPointerDown={(e)=>{ e.preventDefault(); touch.current.right=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.right=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.right=false; }}
-                    className="w-16 h-16 bg-white/5 backdrop-blur-sm rounded-2xl flex items-center justify-center text-4xl shadow-xl border-2 border-white/10 select-none active:bg-white/20 text-white"
+                    className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white"
                 >→</button>
             </div>
 
             {/* Högerstyrning: Eld/Hopp/Spin */}
-            <div className="absolute bottom-4 right-4 flex flex-col items-end gap-3 pointer-events-auto">
+            <div className="absolute bottom-16 right-6 flex flex-col items-end gap-5 pointer-events-auto">
                 {/* Spin-knappen är mindre och lite högre upp */}
                 <button 
                     onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }} 
-                    className={`w-12 h-12 rounded-full border-2 font-black transition-all select-none text-[10px] ${spinEnergy >= 100 ? 'bg-yellow-400/30 text-white border-yellow-400 animate-pulse' : 'bg-white/5 text-white/20 border-white/10'}`}
+                    className={`w-14 h-14 rounded-full border-2 font-black transition-all select-none text-[10px] ${spinEnergy >= 100 ? 'bg-yellow-400/40 text-white border-yellow-400 animate-pulse' : 'bg-white/5 text-white/20 border-white/10'}`}
                 >SPIN</button>
                 
-                <div className="flex gap-4 items-end">
+                <div className="flex gap-5 items-end">
                     <button 
                         onPointerDown={(e)=>{ e.preventDefault(); touch.current.fire=true; }}
-                        className="w-18 h-18 bg-red-600/20 backdrop-blur-sm rounded-full font-black text-2xl shadow-xl border-2 border-white/20 active:bg-red-500/40 text-white flex items-center justify-center"
+                        className="w-22 h-22 bg-red-600/30 backdrop-blur-md rounded-full font-black text-3xl shadow-2xl border-2 border-white/30 active:bg-red-500/50 text-white flex items-center justify-center"
                     >🔥</button>
                     <button 
                         onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
-                        className="w-22 h-22 bg-blue-600/30 backdrop-blur-sm rounded-full font-black text-2xl shadow-xl border-2 border-white/20 active:bg-blue-500/50 text-white flex items-center justify-center"
+                        className="w-24 h-24 bg-blue-600/40 backdrop-blur-md rounded-full font-black text-2xl shadow-2xl border-2 border-white/30 active:bg-blue-500/60 text-white flex items-center justify-center uppercase"
                     >HOPP</button>
                 </div>
             </div>

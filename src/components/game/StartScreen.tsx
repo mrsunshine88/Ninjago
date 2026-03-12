@@ -176,7 +176,7 @@ export function StartScreen({ onStart, scores }: StartScreenProps) {
           </div>
         </div>
 
-      <div className="hidden lg:block space-y-4">
+      <div className="w-full lg:max-w-md space-y-4">
           <Leaderboard scores={scores} />
         </div>
       </div>

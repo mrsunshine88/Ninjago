@@ -16,7 +16,7 @@ export function Leaderboard({ scores }: LeaderboardProps) {
           <Trophy className="text-accent w-5 h-5" />
           Topplista
         </h3>
-        <span className="text-xs uppercase tracking-widest text-muted-foreground">Top 15</span>
+        <span className="text-xs uppercase tracking-widest text-muted-foreground">Topp 5</span>
       </div>
       
       <div className="max-h-[400px] overflow-y-auto">
@@ -34,7 +34,7 @@ export function Leaderboard({ scores }: LeaderboardProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/30">
-              {scores.map((entry, idx) => (
+              {scores.slice(0, 5).map((entry, idx) => (
                 <tr key={idx} className={`hover:bg-primary/5 transition-colors ${idx === 0 ? 'bg-primary/10' : ''}`}>
                   <td className="px-4 py-3 text-sm font-bold">
                     {idx === 0 ? (
