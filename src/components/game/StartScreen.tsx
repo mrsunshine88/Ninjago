@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Flame, Snowflake, Mountain, Zap, Star, Waves, Swords, Volume2, VolumeX } from "lucide-react";
 import { Leaderboard } from "./Leaderboard";
-import { ScoreEntry } from "@/lib/leaderboard";
+import { ScoreEntry, getLeaderboard } from "@/lib/leaderboard";
 
 const ICONS: Record<string, any> = {
   Flame, Snowflake, Mountain, Zap, Star, Waves
@@ -25,6 +25,18 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
   const [selectedNinja, setSelectedNinja] = useState<Ninja | null>(null);
   const [hoveredNinja, setHoveredNinja] = useState<Ninja | null>(null);
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [localScores, setLocalScores] = useState<ScoreEntry[]>(scores);
+
+  useEffect(() => {
+    const refreshScores = async () => {
+      console.log("[v1.65] Refreshing leaderboard...");
+      const latest = await getLeaderboard();
+      if (latest && latest.length > 0) {
+        setLocalScores(latest);
+      }
+    };
+    refreshScores();
+  }, []); // Run on mount
   
   const adminClicksRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -271,13 +283,13 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
         </div>
 
       <div className="w-full lg:max-w-md space-y-4">
-          <Leaderboard scores={scores} />
+          <Leaderboard scores={localScores} />
         </div>
       </div>
 
       {/* Version Tag - v1.39, nedre vänster */}
       <div className="absolute bottom-4 left-4 text-white/50 text-[12px] font-black uppercase tracking-[0.2em] z-50 pointer-events-none select-none italic flex items-center gap-2">
-        v1.59 <span className={`w-1.5 h-1.5 rounded-full bg-green-500`} title="Stealth Key Active" />
+        v1.66 <span className={`w-1.5 h-1.5 rounded-full bg-green-500`} title="Stealth Key Active" />
       </div>
       {/* Credit Text - alltid centrerat längst ned, krockar ej med version */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[#FFD700] text-[11px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] z-50 pointer-events-none select-none whitespace-nowrap">

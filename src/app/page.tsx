@@ -17,7 +17,7 @@ export default function NinjagoGame() {
   const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
   const [score, setScore] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
-  const [gameOverData, setGameOverData] = useState<{ score: number, isHighScore: boolean } | null>(null);
+  const [gameOverData, setGameOverData] = useState<{ score: number, isHighScore: boolean, isWin: boolean } | null>(null);
   const [leaderboard, setLeaderboard] = useState<ScoreEntry[]>([]);
   const [isMuted, setIsMuted] = useState(false);
 
@@ -41,9 +41,9 @@ export default function NinjagoGame() {
   }, []);
 
 
-  const finishGame = useCallback(async (total: number) => {
+  const finishGame = useCallback(async (total: number, isWin: boolean = false) => {
     setGameOverData(null); // Clear old data first
-    console.log(`[v1.56] Finishing game with score: ${total}. Awaiting save...`);
+    console.log(`[v1.66] Finishing game with score: ${total}. Awaiting save...`);
     
     // 1. Spara först (vänta på nätverket)
     const result = await saveScore({
@@ -54,11 +54,11 @@ export default function NinjagoGame() {
     });
     
     // 2. Sätt data och växla vy först när sparandet är bekräftat
-    setGameOverData({ score: total, isHighScore: result.isHighScore });
+    setGameOverData({ score: total, isHighScore: result.isHighScore, isWin });
     const freshLeaderboard = await getLeaderboard();
     setLeaderboard(freshLeaderboard);
     setGameState('gameover');
-    console.log(`[v1.59] Save confirmed & Leaderboard refreshed.`);
+    console.log(`[v1.66] Save confirmed & Leaderboard refreshed.`);
   }, [playerName, selectedNinja]);
 
   const handleStart = useCallback((name: string, ninja: Ninja) => {
@@ -143,6 +143,7 @@ export default function NinjagoGame() {
           playerName={playerName} 
           finalScore={gameOverData.score} 
           isHighScore={gameOverData.isHighScore} 
+          isGameWon={gameOverData.isWin}
           isMuted={isMuted}
           onReset={handleReset}
           onRetry={handleRetry} 

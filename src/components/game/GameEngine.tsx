@@ -683,7 +683,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                         let finalScoreBackup = 0;
                         if (typeof window !== 'undefined') finalScoreBackup = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
                         const finalS = Math.max(Number(s.maxScore) || 0, s.lastReportedScore || 0, Number(localStorage.getItem('ninjago_emergency_score')) || 0);
-                        console.log(`[v1.56] Game Over (Enemy). Final: ${finalS}`);
+                        console.log(`[v1.65] Game Over (Enemy). Final: ${finalS}`);
                         setCurrentScore(finalS);
                         setTimeout(() => onGameOverRef.current(finalS), 1500);
                     } else {
@@ -775,7 +775,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                         let finalScoreBackup = 0;
                         if (typeof window !== 'undefined') finalScoreBackup = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
                         const finalS = Math.max(Number(s.maxScore) || 0, s.lastReportedScore || 0, finalScoreBackup);
-                        console.log(`[v1.56] Game Over (Proj). Final: ${finalS}`);
+                        console.log(`[v1.65] Game Over (Proj). Final: ${finalS}`);
                         setCurrentScore(finalS);
                         setTimeout(() => onGameOverRef.current(finalS), 1500);
                     } else {
@@ -880,7 +880,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                     s.active = false;
                     playSFX('lolo_s-down-474082.mp3', 1.0); 
                     const finalS = Math.max(Number(s.maxScore) || 0, s.lastReportedScore || 0, Number(localStorage.getItem('ninjago_emergency_score')) || 0);
-                    console.log(`[v1.56] Game Over (Boss Touch). Final: ${finalS}`);
+                    console.log(`[v1.65] Game Over (Boss Touch). Final: ${finalS}`);
                     setCurrentScore(finalS);
                     setTimeout(() => onGameOverRef.current(finalS), 1500);
                 }

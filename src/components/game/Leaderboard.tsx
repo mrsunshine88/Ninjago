@@ -20,11 +20,7 @@ export function Leaderboard({ scores }: LeaderboardProps) {
       </div>
       
       <div className="max-h-[400px] overflow-y-auto">
-        {scores.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground italic">
-            Inga rekord ännu. Bli den första!
-          </div>
-        ) : (
+        {Array.isArray(scores) && scores.length > 0 ? (
           <table className="w-full">
             <thead className="text-left text-xs text-muted-foreground border-b bg-muted/30">
               <tr>
@@ -34,7 +30,7 @@ export function Leaderboard({ scores }: LeaderboardProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/30">
-              {Array.isArray(scores) && scores.slice(0, 5).map((entry, idx) => (
+              {scores.slice(0, 5).map((entry, idx) => (
                 <tr key={idx} className={`hover:bg-primary/5 transition-colors ${idx === 0 ? 'bg-primary/10' : ''}`}>
                   <td className="px-4 py-3 text-sm font-bold">
                     {idx === 0 ? (
@@ -46,7 +42,10 @@ export function Leaderboard({ scores }: LeaderboardProps) {
                   <td className="px-4 py-3">
                     <div className="flex flex-col">
                       <span className="font-semibold">{entry.name}</span>
-                      <span className="text-[10px] text-accent uppercase tracking-tighter">{entry.ninja}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-accent uppercase tracking-tighter">{entry.ninja}</span>
+                        {idx === 0 && <span className="bg-yellow-400 text-black text-[8px] px-1 rounded font-black animate-pulse">REKORD</span>}
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 font-mono font-bold text-primary">
@@ -56,6 +55,10 @@ export function Leaderboard({ scores }: LeaderboardProps) {
               ))}
             </tbody>
           </table>
+        ) : (
+          <div className="p-8 text-center italic text-muted-foreground">
+            Hämtar senaste rekorden...
+          </div>
         )}
       </div>
     </div>

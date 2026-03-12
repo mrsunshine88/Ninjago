@@ -26,33 +26,33 @@ function getLocalLeaderboard(): ScoreEntry[] {
 }
 
 export async function getLeaderboard(): Promise<ScoreEntry[]> {
-  // Try to fetch from Firestore (will use Ghost Key in firebase.ts)
+    // definitive v1.65: Raw fetch + client-side sort (No Index required)
   try {
-      console.log("Fetching from Firebase (DEBUG: no orderBy)...");
-      const q = query(collection(db, "leaderboard"), limit(20)); // Temp remove orderBy to check index
-      const snapshot = await getDocs(q);
-      const scores = snapshot.docs.map(doc => {
-        const data = doc.data();
-        console.log("Raw doc data:", data);
-        // Stöd både 'score' och 'points' ifall gamla data fanns
-        const val = Number(data.score !== undefined ? data.score : data.points) || 0;
-        return {
-          name: data.name || "Anonym Ninja",
-          score: val,
-          ninja: data.ninja || "Okänd",
-          date: data.date || data.timestamp?.toDate?.()?.toISOString?.() || new Date().toISOString()
-        } as ScoreEntry;
-      }).sort((a,b) => b.score - a.score);
-      
-      console.log(`Successfully fetched and sorted ${scores.length} scores.`);
-      if (scores.length === 0) return getLocalLeaderboard();
-      return scores;
-    } catch (error) {
-      console.error("Firebase getLeaderboard error:", error);
-      return getLocalLeaderboard();
-    }
-  // 2. Fallback till LocalStorage if Firebase not configured or not used
-  return getLocalLeaderboard();
+    const scoresCol = collection(db, "leaderboard");
+    const snapshot = await getDocs(scoresCol);
+    
+    // Mappa datan och logga antal för felsökning
+    const data = snapshot.docs.map(doc => {
+      const d = doc.data();
+      const val = Number(d.score !== undefined ? d.score : d.points) || 0;
+      return {
+        name: d.name || "Anonym Ninja",
+        score: val,
+        ninja: d.ninja || "Okänd",
+        date: d.date || d.timestamp?.toDate?.()?.toISOString?.() || new Date().toISOString()
+      } as ScoreEntry;
+    });
+    
+    // Sortera lokalt (Client-side sort)
+    const sorted = data.sort((a, b) => Number(b.score) - Number(a.score));
+    console.log(`[v1.65] Returning ${sorted.length} sorted scores to UI`);
+    
+    if (sorted.length === 0) return getLocalLeaderboard();
+    return sorted.slice(0, 5);
+  } catch (error) {
+    console.error("Leaderboard Error:", error);
+    return getLocalLeaderboard();
+  }
 }
 
 export async function saveScore(entry: ScoreEntry): Promise<{ isHighScore: boolean }> {
@@ -63,7 +63,7 @@ export async function saveScore(entry: ScoreEntry): Promise<{ isHighScore: boole
     return { isHighScore: false };
   }
   entry.score = safeScore;
-  console.log(`[v1.50] Attempting global save for ${entry.name}: ${entry.score}`);
+  console.log(`[v1.65] Attempting global save for ${entry.name}: ${entry.score}`);
 
   // 1. Spara till Firestore (Global)
   try {
