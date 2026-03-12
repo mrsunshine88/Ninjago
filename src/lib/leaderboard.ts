@@ -26,8 +26,9 @@ function getLocalLeaderboard(): ScoreEntry[] {
 }
 
 export async function getLeaderboard(): Promise<ScoreEntry[]> {
-  // 1. Försök hämta från Firestore (Global) om nyckel finns
-  if (process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+  // 1. Försök hämta från Firestore (Global) om nyckel finns (eller via fallback)
+  const hasFirebase = !!(process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCjhJK0VuTyyJpiTCxQrqdJYL1KnPQ52J8");
+  if (hasFirebase) {
     try {
       console.log("Fetching from Firebase (DEBUG: no orderBy)...");
       const q = query(collection(db, "leaderboard"), limit(20)); // Temp remove orderBy to check index

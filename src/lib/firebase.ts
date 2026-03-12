@@ -3,12 +3,12 @@ import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   // gitleaks:allow
-  apiKey: process.env.FIREBASE_KEY_APP,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCjhJK0VuTyyJpiTCxQrqdJYL1KnPQ52J8",
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "ninjago-elemental-clas.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "ninjago-elemental-clas",
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "ninjago-elemental-clas.firebasestorage.app",
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "723135523453",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:723135523453:web:fcb2a78c1c810234661f14",
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-0CMLNHR5KZ"
 };
 

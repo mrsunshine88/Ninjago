@@ -249,7 +249,15 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
             ) : (
               <Button 
                 disabled={!canStart}
-                onClick={() => onStart(name, selectedNinja!)}
+                onClick={() => {
+                  // Trigga helskärm på mobil
+                  if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                    document.documentElement.requestFullscreen().catch(() => {
+                      // Ignorera fel om användaren blockerar
+                    });
+                  }
+                  onStart(name, selectedNinja!);
+                }}
                 className="w-full h-16 text-2xl font-black uppercase tracking-widest bg-primary hover:bg-primary/80 btn-game mt-6 rounded-2xl shadow-[0_10px_30px_rgba(239,68,68,0.3)] disabled:opacity-30"
               >
                 Starta Spelet
@@ -265,7 +273,7 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
 
       {/* Version Tag - v1.39, nedre vänster */}
       <div className="absolute bottom-4 left-4 text-white/50 text-[12px] font-black uppercase tracking-[0.2em] z-50 pointer-events-none select-none italic">
-        v1.42
+        v1.44
       </div>
 
       {/* Credit Text - alltid centrerat längst ned, krockar ej med version */}
