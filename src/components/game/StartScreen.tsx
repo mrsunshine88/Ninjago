@@ -152,11 +152,15 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
       <button 
         onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
         onPointerDown={(e) => { e.stopPropagation(); }}
-        className="absolute top-6 right-6 p-4 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl z-50 transition-all active:scale-95 group"
+        className={`absolute top-6 right-6 p-4 backdrop-blur-xl border rounded-2xl shadow-2xl z-50 transition-all active:scale-95 group ${
+          isMuted 
+          ? "bg-red-500/20 border-red-500/50 hover:bg-red-500/30" 
+          : "bg-white/10 border-white/20 hover:bg-white/20"
+        }`}
         title={isMuted ? "Slå på ljud" : "Stäng av ljud"}
       >
         {isMuted ? (
-          <VolumeX className="w-8 h-8 text-red-500 animate-pulse" />
+          <VolumeX className="w-8 h-8 text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
         ) : (
           <Volume2 className="w-8 h-8 text-green-500 group-hover:scale-110 transition-transform" />
         )}
@@ -273,7 +277,7 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
 
       {/* Version Tag - v1.39, nedre vänster */}
       <div className="absolute bottom-4 left-4 text-white/50 text-[12px] font-black uppercase tracking-[0.2em] z-50 pointer-events-none select-none italic flex items-center gap-2">
-        v1.50 <span className={`w-1.5 h-1.5 rounded-full ${process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? 'bg-green-500' : 'bg-red-500'}`} title={process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? 'Firebase OK' : 'No Config'} />
+        v1.52 <span className={`w-1.5 h-1.5 rounded-full ${process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? 'bg-green-500' : 'bg-red-500'}`} title={process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? 'Firebase OK' : 'No Config'} />
       </div>
       {/* Credit Text - alltid centrerat längst ned, krockar ej med version */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[#FFD700] text-[11px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] z-50 pointer-events-none select-none whitespace-nowrap">

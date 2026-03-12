@@ -56,10 +56,14 @@ export function BattleView({
                 variant="outline" 
                 onClick={(e) => { e.stopPropagation(); onToggleMute(); }} 
                 onPointerDown={(e) => { e.stopPropagation(); }}
-                className="bg-white/10 hover:bg-white/20 text-white border-white/20 h-12 w-12 rounded-xl active:scale-95 transition-all p-0 flex items-center justify-center"
+                className={`h-12 w-12 rounded-xl active:scale-95 transition-all p-0 flex items-center justify-center border-2 ${
+                  isMuted 
+                  ? "bg-red-500/20 border-red-500/50 hover:bg-red-500/30" 
+                  : "bg-white/10 border-white/20 hover:bg-white/20"
+                }`}
                 title={isMuted ? "Slå på ljud" : "Stäng av ljud"}
             >
-                {isMuted ? <VolumeX className="w-6 h-6 text-red-500" /> : <Volume2 className="w-6 h-6 text-green-500" />}
+                {isMuted ? <VolumeX className="w-6 h-6 text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]" /> : <Volume2 className="w-6 h-6 text-green-500" />}
             </Button>
 
             <Button 

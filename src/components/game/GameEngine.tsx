@@ -454,7 +454,6 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
             // Camera
             s.cameraX = Math.max(s.cameraX, s.x - 200);
             s.cameraX = Math.min(s.cameraX, level.length - 800);
-            ctx.translate(-s.cameraX, 0);
             s.energy = Math.min(100, s.energy + 0.2); 
         }
         
