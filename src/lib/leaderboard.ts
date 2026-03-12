@@ -27,7 +27,7 @@ function getLocalLeaderboard(): ScoreEntry[] {
 
 export async function getLeaderboard(): Promise<ScoreEntry[]> {
   // 1. Försök hämta från Firestore (Global) om nyckel finns
-  const hasFirebase = !!(process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSy");
+  const hasFirebase = !!(process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
   if (hasFirebase) {
     try {
       console.log("Fetching from Firebase (DEBUG: no orderBy)...");
