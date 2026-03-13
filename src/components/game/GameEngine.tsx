@@ -1405,7 +1405,7 @@ export function GameEngine({
             }
             ctx.filter = 'none'; // [v3.45] Explicit reset
         } catch (err) {
-            console.error('[v3.50] Render Crash Recovered:', err);
+            console.error('[v3.52] Render Crash Recovered:', err);
         }
         raf = requestAnimationFrame(loop);
     };
@@ -1459,8 +1459,8 @@ export function GameEngine({
 
             {gameStarted && (
                 <div className="absolute inset-0 z-[200] pointer-events-none">
-                    {/* [v3.50] TOP LEFT: Ninja + HP (Hearts) */}
-                    <div className="absolute top-2 left-2 md:top-4 md:left-4 flex flex-col gap-1 items-start pointer-events-auto">
+                    {/* [v3.51] TOP LEFT: Ninja + HP (Hearts) - Moved slightly down to avoid solid header overlap if needed, but header is outside this div now */}
+                    <div className="absolute top-1 left-2 md:top-4 md:left-4 flex flex-col gap-1 items-start pointer-events-auto">
                         <div className="flex items-center gap-2">
                             <div className={`w-10 h-10 md:w-14 md:h-14 rounded-full border-2 overflow-hidden bg-black/40 ${spinEnergy >= 100 ? 'border-yellow-400 shadow-[0_0_20px_#fbbf24]' : 'border-white/20'}`}>
                                 <img src={`/${ninja.id}.png`} className="w-full h-full object-cover" alt={ninja.name} />
@@ -1510,31 +1510,46 @@ export function GameEngine({
                         >→</button>
                     </div>
 
-                    {/* Högerstyrning: [v3.50] Cornered, Transparent & Safe Areas */}
-                    <div className="absolute bottom-4 right-4 md:bottom-8 md:right-8 flex items-end gap-3 pointer-events-auto z-[3000] pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)]">
-                        <div className="flex flex-col items-center gap-6">
-                            {/* SPIN (🌪️) - Överst */}
-                            <button
-                                onPointerDown={(e) => { e.preventDefault(); if(spinEnergy >= 100) { state.current.spin = true; state.current.spinT = 150; state.current.energy = 0; } }}
-                                className={`w-16 h-16 md:w-20 md:h-20 rounded-full border-2 font-black transition-all select-none text-[8px] flex items-center justify-center ${spinEnergy >= 100
-                                        ? 'bg-yellow-400 text-black border-yellow-200 shadow-[0_0_20px_#fbbf24] animate-pulse opacity-100'
-                                        : 'bg-yellow-600/20 text-white/50 border-yellow-500/10 opacity-30 pointer-events-none'
-                                    }`}
-                            >SPIN</button>
+                    {/* Vänsterstyrning: Pilar - [v3.52] Positioned slightly above footer */}
+                    <div className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 md:bottom-24 md:left-8 flex gap-3 pointer-events-auto z-[3000] pl-[env(safe-area-inset-left)]">
+                        <button
+                            onPointerDown={(e) => { e.preventDefault(); touch.current.left = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.left = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.left = false; }}
+                            className="w-14 h-14 md:w-24 md:h-24 bg-white/10 backdrop-blur-lg rounded-xl flex items-center justify-center text-2xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white opacity-40 active:opacity-100 transition-opacity"
+                        >←</button>
+                        <button
+                            onPointerDown={(e) => { e.preventDefault(); touch.current.right = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.right = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.right = false; }}
+                            className="w-14 h-14 md:w-24 md:h-24 bg-white/10 backdrop-blur-lg rounded-xl flex items-center justify-center text-2xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white opacity-40 active:opacity-100 transition-opacity"
+                        >→</button>
+                    </div>
 
-                            {/* SKJUT (🔥) */}
+                    {/* Högerstyrning: [v3.52] CLUSTERED ACTION TRIAD - Consistent with user reference */}
+                    <div className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 md:bottom-24 md:right-8 flex flex-col items-center gap-2 pointer-events-auto z-[3000] pr-[env(safe-area-inset-right)]">
+                        
+                        {/* SPIN (🌪️) - Överst centrerad */}
+                        <button
+                            onPointerDown={(e) => { e.preventDefault(); if(spinEnergy >= 100) { state.current.spin = true; state.current.spinT = 150; state.current.energy = 0; } }}
+                            className={`w-12 h-12 md:w-20 md:h-20 rounded-full border-2 font-black transition-all select-none text-[8px] flex items-center justify-center mb-1 ${spinEnergy >= 100
+                                    ? 'bg-yellow-400 text-black border-yellow-200 shadow-[0_0_20px_#fbbf24] animate-pulse opacity-100'
+                                    : 'bg-black/60 text-white/40 border-white/10 opacity-30 pointer-events-none'
+                                }`}
+                        >Spin</button>
+
+                        {/* Nedre raden: Skjut & Hopp */}
+                        <div className="flex items-center gap-3">
                             <button
                                 onPointerDown={(e) => { e.preventDefault(); state.current.fireReq = true; touch.current.fire = true; }}
                                 onPointerUp={() => touch.current.fire = false}
-                                className="w-16 h-16 md:w-20 md:h-20 bg-red-600/30 backdrop-blur-lg rounded-full font-black text-2xl shadow-2xl border-2 border-red-400/20 active:bg-red-600/60 active:opacity-100 opacity-40 transition-all text-white flex items-center justify-center"
-                            >🔥</button>
-                        </div>
+                                className="w-16 h-16 md:w-24 md:h-24 bg-red-600/60 backdrop-blur-lg rounded-full font-black text-[9px] shadow-2xl border-2 border-red-400/30 active:bg-red-600/90 active:opacity-100 opacity-60 transition-all text-white flex flex-col items-center justify-center gap-0.5 uppercase tracking-tighter"
+                            >
+                                <span className="text-xl">🔥</span>
+                                <span className="leading-none">Skjut</span>
+                            </button>
 
-                        {/* HOPP (Blå) */}
-                        <button
-                            onPointerDown={(e) => { e.preventDefault(); state.current.jumpReq = true; touch.current.jump = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.jump = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.jump = false; }}
-                            className="w-20 h-20 md:w-28 md:h-28 bg-blue-600/30 backdrop-blur-lg rounded-full font-black text-[10px] shadow-2xl border-2 border-blue-400/20 active:bg-blue-600/60 active:opacity-100 opacity-40 transition-all text-white flex items-center justify-center uppercase tracking-widest"
-                        >HOPP</button>
+                            <button
+                                onPointerDown={(e) => { e.preventDefault(); state.current.jumpReq = true; touch.current.jump = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.jump = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.jump = false; }}
+                                className="w-20 h-20 md:w-32 md:h-32 bg-blue-600/60 backdrop-blur-lg rounded-full font-black text-[10px] shadow-2xl border-4 border-blue-400/30 active:bg-blue-600/90 active:opacity-100 opacity-60 transition-all text-white flex items-center justify-center uppercase tracking-[0.1em] scale-110"
+                            >HOPPA</button>
+                        </div>
                     </div>
                 </>
             )}

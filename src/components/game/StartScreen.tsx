@@ -127,7 +127,7 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute, isNyaUnloc
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-center p-6 gap-8 overflow-y-auto overflow-x-hidden cursor-default" suppressHydrationWarning>
+    <div className="relative h-[100dvh] w-full flex flex-col items-center justify-start md:justify-center pt-8 pb-24 px-4 md:p-6 gap-6 md:gap-8 overflow-y-auto overflow-x-hidden cursor-default" suppressHydrationWarning>
       {/* PWA Install Banner - [v3.23] Hydration Safe Width Check */}
       {isMounted && showInstallBanner && installPrompt && window.innerWidth < 768 && (
         <div className="fixed inset-0 z-[9999] flex items-end justify-center pointer-events-none">
@@ -339,29 +339,27 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute, isNyaUnloc
           </div>
         </div>
 
-        {/* [v3.49] Leaderboard - Hidden on small mobile screens to save space during setup */}
-        <div className="hidden sm:block">
+        {/* [v3.51] Leaderboard - Restored and Scrollable on all devices */}
+        <div className="w-full mt-4 max-h-[180px] md:max-h-64 overflow-y-auto custom-scrollbar rounded-xl border border-white/10 bg-black/60 p-2 shadow-inner">
           <Leaderboard scores={localScores} />
         </div>
       </div>
 
-      <div className="fixed bottom-4 right-4 text-[10px] text-white/20 font-black tracking-widest uppercase">
-        v3.50 | Optimized for Mobile
-      </div>
 
-      {/* Bottom info row - [v3.46] Stack on mobile to avoid overlap */}
-      <div className="absolute bottom-[calc(1rem+env(safe-area-inset-bottom))] left-0 w-full px-[calc(1.5rem+env(safe-area-inset-left))] pr-[calc(1.5rem+env(safe-area-inset-right))] flex flex-col md:flex-row items-center justify-between gap-4 z-50 pointer-events-none select-none">
+      {/* [v3.52] Bottom info row - Moved to flow to avoid overlap on small screens */}
+      <div className="w-full mt-12 mb-8 px-4 flex flex-col md:flex-row items-center justify-between gap-6 pointer-events-none select-none border-t border-white/5 pt-8">
         {/* Version Tag */}
         <div className="text-white/50 text-[12px] font-black uppercase tracking-[0.2em] italic flex items-center gap-2">
-          v3.48 <span className="px-1.5 py-0.5 bg-red-600 text-white text-[8px] rounded animate-pulse">ULTIMATE EVOLUTION</span>
+          <span className="text-primary group-hover:text-white transition-colors">v3.52</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+          <span className="bg-red-500/10 text-red-500/60 px-2 py-0.5 rounded text-[10px]">ULTIMATE EVOLUTION</span>
         </div>
         
         {/* Credit Text */}
-        <div className="text-[#FFD700] text-[11px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] whitespace-nowrap">
+        <div className="text-[#FFD700] text-[11px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] whitespace-nowrap opacity-60">
           Game Idea & Design by Lukas Persson
         </div>
       </div>
-
     </div>
   );
 }
