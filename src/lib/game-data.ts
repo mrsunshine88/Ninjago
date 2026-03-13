@@ -42,6 +42,7 @@ export const NINJAS: Ninja[] = [
   { id: 'zane', name: 'Zane', power: 'Is', description: 'Mästare av Is. Fryser fiender!', color: '#F8FAFC', icon: 'Snowflake', spriteCol: 1 },
   { id: 'cole', name: 'Cole', power: 'Jord', description: 'Mästare av Jord. Skapar jordskalv!', color: '#171717', icon: 'Mountain', spriteCol: 2 },
   { id: 'lloyd', name: 'Lloyd', power: 'Energi', description: 'Den Gröna Ninjan. Massiv kraft!', color: '#22C55E', icon: 'Star', spriteCol: 4 },
+  { id: 'nya_smith', name: 'Nya Smith', power: 'Vatten/Is', description: 'Vattnet är hennes bundsförvant. Dränker fienden!', color: '#00ccff', icon: 'Waves', spriteCol: 5 },
 ];
 
 export const LEVELS: Level[] = [
@@ -164,16 +165,38 @@ export const LEVELS: Level[] = [
     platformColor: '#1e1b4b',
     atmosphereType: 'void',
     difficulty: 6,
-    bossPoints: 20000,
+    bossPoints: 30000,
     timeLimit: 300,
     boss: { 
       name: 'Overlord', 
-      description: 'Den absoluta huvudfienden. Undvik hans röda blixtar!', 
+      description: 'Den absoluta huvudfienden. Undvik hans mörka krafter!', 
       imageKey: 'overlord', 
       behavior: 'final',
       spriteRow: 3,
       spriteCol: 3,
-      healthMultiplier: 20,
+      healthMultiplier: 10,
+      canShoot: true
+    } 
+  },
+  { 
+    number: 7, 
+    name: 'DEN HEMLIGA NIVÅN: Lord Garmadon',
+    description: 'Den yttersta prövningen. Garmadon i sin mörkaste form!',
+    length: 15000,
+    bgColor: '#0a0010', // Mörk lila ton
+    platformColor: '#2b0040',
+    atmosphereType: 'void',
+    difficulty: 6,
+    bossPoints: 50000,
+    timeLimit: 360,
+    boss: { 
+      name: 'Lord Garmadon', 
+      description: 'Mörkrets herre. Skjuter sicksack-projektiler!', 
+      imageKey: 'lord garmadon', 
+      behavior: 'final',
+      spriteRow: 3,
+      spriteCol: 4,
+      healthMultiplier: 15,
       canShoot: true
     } 
   },

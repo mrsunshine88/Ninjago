@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Ninja, NINJAS } from "@/lib/game-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,16 +19,20 @@ interface StartScreenProps {
   scores: ScoreEntry[];
   isMuted: boolean;
   onToggleMute: () => void;
+  isNyaUnlocked: boolean;
+  onReset: () => void;
 }
 
-export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScreenProps) {
+export function StartScreen({ onStart, scores, isMuted, onToggleMute, isNyaUnlocked, onReset }: StartScreenProps) {
   const [name, setName] = useState("");
   const [selectedNinja, setSelectedNinja] = useState<Ninja | null>(null);
   const [hoveredNinja, setHoveredNinja] = useState<Ninja | null>(null);
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [localScores, setLocalScores] = useState<ScoreEntry[]>(scores);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     const refreshScores = async () => {
       const latest = await getLeaderboard();
       if (latest && latest.length > 0) {
@@ -37,7 +41,7 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
     };
     refreshScores();
   }, []); // Run on mount
-  
+
   const adminClicksRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -56,21 +60,31 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
     }
   };
 
-  const handleAdminReset = async () => {
+  const handleAdminReset = useCallback(async () => {
     if (name === "020406") {
-      // Silent Admin Reset
+      // Cleanest Reset: localStorage + State + Redirect
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('ninjago-scores');
+        localStorage.setItem('ninjago_emergency_score', '0');
+
+        // Denna rad nollställer karaktärer och spelets inre logik
+        onReset();
+      }
+
       await resetGlobalLeaderboard();
       setLocalScores([]);
-      window.location.reload();
-    } else {
+
+      setTimeout(() => {
+        window.location.href = window.location.origin + window.location.pathname;
+      }, 300);
+
       setIsAdminMode(false);
       setName("");
     }
-  };
+  }, [name, onReset]);
 
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
-  const menuMusicRef = useRef<Howl | null>(null);
 
   useEffect(() => {
     // PWA Install Logic: Capture from global window
@@ -83,7 +97,7 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
 
     checkPrompt();
     window.addEventListener("pwa-prompt-available", checkPrompt);
-    
+
     const handler = (e: any) => {
       e.preventDefault();
       (window as any).deferredPrompt = e;
@@ -97,65 +111,25 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
     };
   }, []);
 
-  useEffect(() => {
-    // Nuclear Audio: Using Howl definitively
-    if (!menuMusicRef.current) {
-        menuMusicRef.current = new Howl({
-            src: ['/audio/lucadialessandro-arcade-melody-295434.mp3'],
-            loop: true,
-            volume: 0.4,
-            autoplay: true,
-            onplay: () => {
-              if (Howler.ctx && Howler.ctx.state !== 'running') Howler.ctx.resume();
-            }
-        });
-    }
-
-    // Force resume on mount too
-    if (Howler.ctx && Howler.ctx.state !== 'running') Howler.ctx.resume();
-    
-    return () => {
-      // Vi behåller ref
-    };
-  }, []);
-
-  // Stäng av musiken helt när vi lämnar startskärmen
-  useEffect(() => {
-    return () => {
-        if (menuMusicRef.current) {
-            menuMusicRef.current.stop();
-            menuMusicRef.current = null;
-        }
-    };
-  }, []);
-
-  // [v2.35] Sync Music with Mute state
-  useEffect(() => {
-    if (!isMuted && menuMusicRef.current && !menuMusicRef.current.playing()) {
-      menuMusicRef.current.play();
-      console.log("[v2.35] Music forced to play: menuMusic");
-    }
-  }, [isMuted]);
-
   const handleInstall = async () => {
     if (!installPrompt) return;
-    
+
     // [v2.30] Wake up Audio
     if (Howler.ctx && Howler.ctx.state !== 'running') Howler.ctx.resume();
 
     installPrompt.prompt();
     const { outcome } = await installPrompt.userChoice;
-    if (outcome === "accepted") { 
-      setInstallPrompt(null); 
-      setShowInstallBanner(false); 
+    if (outcome === "accepted") {
+      setInstallPrompt(null);
+      setShowInstallBanner(false);
     }
     setShowInstallBanner(false);
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-center p-6 gap-8 overflow-hidden cursor-default">
-      {/* PWA Install Banner - [v2.30] Göm på desktop (width < 768) */}
-      {showInstallBanner && installPrompt && typeof window !== 'undefined' && window.innerWidth < 768 && (
+    <div className="relative min-h-screen w-full flex flex-col items-center justify-center p-6 gap-8 overflow-hidden cursor-default" suppressHydrationWarning>
+      {/* PWA Install Banner - [v3.23] Hydration Safe Width Check */}
+      {isMounted && showInstallBanner && installPrompt && window.innerWidth < 768 && (
         <div className="fixed inset-0 z-[9999] flex items-end justify-center pointer-events-none">
           <div className="pointer-events-auto w-full max-w-lg mx-4 mb-6 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-3xl shadow-[0_0_60px_rgba(251,191,36,0.5)] border-4 border-white p-6 animate-in slide-in-from-bottom duration-500">
             <div className="flex items-center gap-4">
@@ -179,9 +153,9 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
         </div>
       )}
 
-      {/* [v2.30] Liten install-knapp - Göm också på desktop */}
-      {installPrompt && !showInstallBanner && typeof window !== 'undefined' && window.innerWidth < 768 && (
-        <button 
+      {/* [v3.23] Hydration Safe Width Check */}
+      {isMounted && installPrompt && !showInstallBanner && window.innerWidth < 768 && (
+        <button
           onClick={() => setShowInstallBanner(true)}
           className="absolute top-6 left-6 px-4 py-2 bg-yellow-400 text-black font-black rounded-full shadow-2xl z-50 flex items-center gap-2 border-2 border-black text-sm"
         >
@@ -190,37 +164,40 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
       )}
 
       {/* Mute Toggle Button */}
-      <button 
-        onClick={(e) => { 
-          e.stopPropagation(); 
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
           if (typeof onToggleMute === 'function') {
-            onToggleMute(); 
+            onToggleMute();
           }
         }}
         onPointerDown={(e) => { e.stopPropagation(); }}
-        className={`absolute top-6 right-6 p-4 backdrop-blur-xl border rounded-2xl shadow-2xl z-50 transition-all active:scale-95 group ${
-          isMuted 
-          ? "bg-red-500/20 border-red-500/50 hover:bg-red-500/30" 
+        className={`absolute top-6 right-6 p-4 backdrop-blur-xl border rounded-2xl shadow-2xl z-50 transition-all active:scale-95 group ${isMuted
+          ? "bg-red-500/20 border-red-500/50 hover:bg-red-500/30"
           : "bg-white/10 border-white/20 hover:bg-white/20"
-        }`}
+          }`}
         title={isMuted ? "Slå på ljud" : "Stäng av ljud"}
       >
-        {isMuted ? (
-          <VolumeX className="w-8 h-8 text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
+        {isMounted ? (
+          isMuted ? (
+            <VolumeX className="w-8 h-8 text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
+          ) : (
+            <Volume2 className="w-8 h-8 text-green-500 group-hover:scale-110 transition-transform" />
+          )
         ) : (
-          <Volume2 className="w-8 h-8 text-green-500 group-hover:scale-110 transition-transform" />
+          <div className="w-8 h-8 bg-white/5 rounded-full animate-pulse" />
         )}
       </button>
 
       {/* Bakgrund */}
-      <div 
+      <div
         className={`absolute inset-0 bg-gradient-to-br from-black via-[#1a140f] to-black transition-all duration-1000 -z-20 ${hoveredNinja ? 'opacity-40 blur-sm scale-110' : 'opacity-100'}`}
       />
-      
+
       {/* Mörkt Overlay */}
       <div className="absolute inset-0 bg-black/60 -z-10" />
 
-      <div 
+      <div
         className="text-center space-y-4 cursor-pointer select-none active:scale-95 transition-transform"
         onClick={handleLogoClick}
       >
@@ -242,7 +219,7 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
               <Label htmlFor="name" className="text-xl font-black text-white uppercase tracking-widest">
                 {isAdminMode ? "LÖSENORD:" : "Ditt Ninja-namn"}
               </Label>
-              <Input 
+              <Input
                 id="name"
                 type={isAdminMode ? "password" : "text"}
                 placeholder={isAdminMode ? "****" : "Skriv ditt namn..."}
@@ -252,68 +229,102 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
               />
             </div>
 
-            {!isAdminMode && (
-              <div className="space-y-4 pt-4">
-                <Label className="text-xl font-black text-white uppercase tracking-widest">Välj din Ninja</Label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {NINJAS.map((ninja) => {
-                    const IconComp = ICONS[ninja.icon] || Flame;
-                    const isSelected = selectedNinja?.id === ninja.id;
-                    const isHovered = hoveredNinja?.id === ninja.id;
-                    
-                    return (
-                      <button
-                        key={ninja.id}
-                        onMouseEnter={() => setHoveredNinja(ninja)}
-                        onMouseLeave={() => setHoveredNinja(null)}
-                        onClick={() => setSelectedNinja(ninja)}
-                        className={`
+            {/* [v3.23] Structural Stability: Div is always in DOM but hidden via CSS */}
+            <div className={`space-y-4 pt-4 transition-all ${(!isAdminMode && isMounted) ? 'opacity-100 scale-100 block' : 'opacity-0 scale-95 hidden pointer-events-none'}`}>
+              <Label className="text-xl font-black text-white uppercase tracking-widest">Välj din Ninja</Label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {NINJAS.map((ninja) => {
+                  const IconComp = ICONS[ninja.icon] || Flame;
+                  const isSelected = selectedNinja?.id === ninja.id;
+                  const isHovered = hoveredNinja?.id === ninja.id;
+                  const isNya = ninja.id === 'nya_smith';
+                  const isLocked = isNya && !isNyaUnlocked;
+
+                  return (
+                    <button
+                      key={ninja.id}
+                      onMouseEnter={() => !isLocked && setHoveredNinja(ninja)}
+                      onMouseLeave={() => setHoveredNinja(null)}
+                      onClick={() => !isLocked && setSelectedNinja(ninja)}
+                      disabled={isLocked}
+                      className={`
                           group relative p-5 rounded-2xl border-2 transition-all duration-300 text-left overflow-hidden
-                          ${isSelected 
-                            ? 'border-accent bg-accent/30 shadow-[0_0_30px_rgba(255,255,255,0.2)] scale-105' 
+                          ${isSelected
+                          ? 'border-accent bg-accent/30 shadow-[0_0_30px_rgba(255,255,255,0.2)] scale-105'
+                          : isLocked
+                            ? 'border-white/10 bg-black/60'
                             : 'border-white/10 bg-white/5 hover:border-primary/50 hover:bg-white/10'}
                         `}
-                      >
-                        <div 
-                          className={`absolute inset-0 opacity-20 transition-all duration-500 ${isHovered || isSelected ? 'scale-110' : 'scale-100'}`}
-                          style={{ backgroundColor: ninja.color }}
-                        />
-                        <IconComp className={`w-10 h-10 mb-2 relative z-10 ${isSelected ? 'text-accent' : 'text-white/60 group-hover:text-primary'}`} />
-                        <div className="font-black text-sm uppercase relative z-10 text-white">{ninja.name}</div>
-                        <div className="text-[10px] text-white/60 uppercase font-bold relative z-10">{ninja.power}</div>
-                        {isSelected && <div className="absolute top-3 right-3 w-3 h-3 bg-accent rounded-full animate-ping z-10" />}
-                      </button>
-                    );
-                  })}
-                </div>
+                    >
+                      <div
+                        className={`absolute inset-0 opacity-20 transition-all duration-500 ${isHovered || isSelected ? 'scale-110' : 'scale-100'}`}
+                        style={{ backgroundColor: isLocked ? '#333' : ninja.color }}
+                      />
+
+                      {isLocked ? (
+                        <div className="flex flex-col items-center justify-center py-2 relative z-10 w-full translate-y-2">
+                          <img src="/Nya Smith.png" alt="Nya Smith" className="w-12 h-12 mb-2 relative z-10 object-contain" />
+                          <div className="font-black text-[10px] uppercase text-white/40 text-center leading-tight">Nå 20 000p för att låsa upp</div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="relative mb-2">
+                            <IconComp className={`w-10 h-10 relative z-10 ${isSelected ? 'text-accent' : 'text-white/60 group-hover:text-primary'}`} />
+                          </div>
+                          <div className="font-black text-sm uppercase relative z-10 text-white flex items-center gap-1">
+                            {ninja.id === 'kai' && '🔥'}
+                            {ninja.id === 'jay' && '⚡'}
+                            {ninja.id === 'zane' && '❄️'}
+                            {ninja.id === 'cole' && '🪨'}
+                            {ninja.id === 'lloyd' && '⭐'}
+                            {isMounted && isNya && <Waves className="w-4 h-4 text-[#00ccff]" />}
+                            {ninja.name}
+                          </div>
+                          <div className="text-[10px] text-white/60 uppercase font-bold relative z-10 flex justify-between w-full">
+                            <span>{ninja.power}</span>
+                            <span className="text-accent">
+                              STYRKA: {ninja.id === 'lloyd' ? '95' :
+                                ninja.id === 'cole' ? '80' :
+                                  ninja.id === 'kai' ? '70' :
+                                    ninja.id === 'jay' ? '60' :
+                                      ninja.id === 'zane' ? '50' :
+                                        ninja.id === 'nya_smith' ? '20' : '0'}
+                            </span>
+                          </div>
+                          {isSelected && <div className="absolute top-3 right-3 w-3 h-3 bg-accent rounded-full animate-ping z-10" />}
+                        </>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-            )}
+            </div>
 
             {isAdminMode ? (
-              <Button 
+              <Button
                 onClick={handleAdminReset}
                 className="w-full h-16 text-2xl font-black uppercase tracking-widest bg-accent hover:bg-accent/80 btn-game mt-6 rounded-2xl shadow-lg"
               >
                 OK
               </Button>
             ) : (
-              <Button 
+              <Button
                 disabled={!canStart}
                 onClick={() => {
                   // [v2.30] Wake up Audio
                   if (Howler.ctx && Howler.ctx.state !== 'running') Howler.ctx.resume();
 
-                  const recordElem = document.documentElement;
+                  const recordElem = document.documentElement as any;
                   if (recordElem.requestFullscreen) {
-                    recordElem.requestFullscreen().catch(err => {
-                      // Silently fail fullscreen
-                    });
+                    recordElem.requestFullscreen().catch((err: any) => { });
+                  } else if (recordElem.webkitRequestFullscreen) {
+                    recordElem.webkitRequestFullscreen();
+                  } else if (recordElem.msRequestFullscreen) {
+                    recordElem.msRequestFullscreen();
                   }
 
-                  if (typeof window !== 'undefined') {
-                    localStorage.clear();
-                  }
-                  
+                  // [v2.42] Removed localStorage.clear() to preserve unlock status
+
                   if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
                     document.body.style.overflow = 'hidden';
                     document.body.style.touchAction = 'none';
@@ -329,19 +340,20 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
           </div>
         </div>
 
-      <div className="w-full lg:max-w-md space-y-4">
+        <div className="w-full lg:max-w-md space-y-4">
           <Leaderboard scores={localScores} />
         </div>
       </div>
 
       {/* Version Tag - v2.23, nedre vänster */}
       <div className="absolute bottom-4 left-4 text-white/50 text-[12px] font-black uppercase tracking-[0.2em] z-50 pointer-events-none select-none italic flex items-center gap-2">
-        v2.23 <span className={`w-1.5 h-1.5 rounded-full bg-green-500`} title="Stealth Key Active" />
+        v3.40 <span className="px-1.5 py-0.5 bg-red-600 text-white text-[8px] rounded animate-pulse">ULTIMATE EVOLUTION</span>
       </div>
       {/* Credit Text - alltid centrerat längst ned, krockar ej med version */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[#FFD700] text-[11px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] z-50 pointer-events-none select-none whitespace-nowrap">
         Game Idea & Design by Lukas Persson
       </div>
+
     </div>
   );
 }

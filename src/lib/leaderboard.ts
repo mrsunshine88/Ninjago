@@ -7,7 +7,7 @@ export interface ScoreEntry {
 }
 
 import { db } from "./firebase";
-import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, writeBatch } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, writeBatch, where, updateDoc, doc } from "firebase/firestore";
 
 export async function getLeaderboard(): Promise<ScoreEntry[]> {
     // Global Sync: Force cloud fetch, NO local fallback
@@ -27,11 +27,18 @@ export async function getLeaderboard(): Promise<ScoreEntry[]> {
       } as ScoreEntry;
     });
     
-    // Sortera lokalt (Client-side sort) - v1.73 krav
-    const sorted = data.sort((a, b) => Number(b.score) - Number(a.score));
+    // v2.45: Client-side unique filter (just in case of old duplicates)
+    const uniqueMap = new Map<string, ScoreEntry>();
+    data.forEach(entry => {
+      if (!uniqueMap.has(entry.name) || entry.score > uniqueMap.get(entry.name)!.score) {
+        uniqueMap.set(entry.name, entry);
+      }
+    });
+    
+    const sorted = Array.from(uniqueMap.values()).sort((a, b) => Number(b.score) - Number(a.score));
     
     // v2.11: Returnerar tom lista om molnet är tomt
-    return sorted.slice(0, 10);
+    return sorted.slice(0, 5); // v2.45: Visar topp 5 unika
   } catch (error) {
     console.error("Global Leaderboard Error:", error);
     return [];
@@ -56,16 +63,41 @@ export async function saveScore(entry: ScoreEntry): Promise<{ isRankOne: boolean
 
   console.log(`[v2.23] Global Sync Save. Best: ${currentBest}, New: ${safeScore}, Rank 1 Verdict: ${isRank1 ? '👑 CHAMPION!' : 'NO'}`);
 
-  // 3. Spara till Firestore (Global Collection: scores)
+  // 3. [v2.45] Spara/Uppdatera Firestore (Global Collection: scores)
   try {
-    await addDoc(collection(db, "scores"), {
-      name: entry.name,
-      ninja: entry.ninja,
-      score: Number(entry.score),
-      timestamp: serverTimestamp()
-    });
+    const scoresCol = collection(db, "scores");
+    const q = query(scoresCol, where("name", "==", entry.name));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+      // Namnet finns redan, kolla bästa poäng
+      const existingDoc = querySnapshot.docs[0];
+      const existingData = existingDoc.data();
+      const existingScore = Number(existingData.score || 0);
+
+      if (safeScore > existingScore) {
+        // Nytt rekord för spelaren! Uppdatera doc
+        await updateDoc(doc(db, "scores", existingDoc.id), {
+          score: safeScore,
+          ninja: entry.ninja,
+          timestamp: serverTimestamp()
+        });
+        console.log(`[v2.45] Updated record for ${entry.name}: ${safeScore}`);
+      } else {
+        console.log(`[v2.45] Score ${safeScore} is not higher than existing ${existingScore} for ${entry.name}. Skipping update.`);
+      }
+    } else {
+      // Ny spelare! Lägg till doc
+      await addDoc(collection(db, "scores"), {
+        name: entry.name,
+        ninja: entry.ninja,
+        score: safeScore,
+        timestamp: serverTimestamp()
+      });
+      console.log(`[v2.45] Created new record for ${entry.name}: ${safeScore}`);
+    }
   } catch (e) {
-    console.error("Firestore save error:", e);
+    console.error("Firestore save/update error:", e);
   }
   
   return { isRankOne: isRank1 };

@@ -29,23 +29,23 @@ export function GameOverView({ playerName, finalScore, ninjaName, isGameWon, isM
         ninja: ninjaName,
         date: new Date().toISOString()
       });
-      
+
       const isActuallyRankOne = result.isRankOne;
-      
-      if (isActuallyRankOne) {
+
+      if (isActuallyRankOne || isGameWon) {
         setWinVerdict('CHAMPION');
         new Howl({ src: ["/audio/SPELA UPP NÄR MAN SLÅR REKORD.mp3"], autoplay: true });
-        
+
         // Guld-partiklar
-        const colors = ['#ffcc00', '#ff4444', '#00ccff', '#ff00ff', '#ffffff'];
-        setParticles(Array.from({ length: 120 }).map((_, i) => ({
+        const colors = ['#ffcc00', '#ff4444', '#00ccff', '#ff00ff', '#ffffff', '#FFD700'];
+        setParticles(Array.from({ length: 150 }).map((_, i) => ({
           id: i,
           x: Math.random() * 100,
-          y: -10 - Math.random() * 20,
+          y: -20 - Math.random() * 50,
           color: colors[Math.floor(Math.random() * colors.length)],
-          size: 5 + Math.random() * 10,
+          size: 5 + Math.random() * 15,
           angle: Math.random() * Math.PI * 2,
-          speed: 2 + Math.random() * 5
+          speed: 1.5 + Math.random() * 4
         })));
       } else {
         setWinVerdict('DENIED');
@@ -62,7 +62,7 @@ export function GameOverView({ playerName, finalScore, ninjaName, isGameWon, isM
     const timer = setInterval(() => {
       setCountdown((prev) => Math.max(0, prev - 1));
     }, 1000);
-    
+
     return () => clearInterval(timer);
   }, [finalScore]);
 
@@ -76,9 +76,9 @@ export function GameOverView({ playerName, finalScore, ninjaName, isGameWon, isM
   const isActuallyRankOne = winVerdict === 'CHAMPION';
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col items-center justify-center p-6 gap-8 text-center bg-black">
+    <div className="min-h-screen bg-black relative overflow-hidden flex flex-col items-center justify-center p-6 gap-8 text-center">
       {particles.map(p => (
-        <div 
+        <div
           key={p.id}
           className="absolute pointer-events-none"
           style={{
@@ -94,13 +94,19 @@ export function GameOverView({ playerName, finalScore, ninjaName, isGameWon, isM
         />
       ))}
 
-      <div className={`z-10 bg-card/75 backdrop-blur-3xl px-6 py-8 rounded-[40px] border-4 shadow-2xl space-y-4 max-w-md w-full transition-all duration-500 flex flex-col items-start ${
-        isActuallyRankOne 
-          ? 'shadow-[0_0_50px_rgba(250,204,21,0.6)] border-yellow-400/50' 
+      <div className={`z-10 bg-card/75 backdrop-blur-3xl px-6 py-8 rounded-[40px] border-4 shadow-2xl space-y-4 max-w-md w-full transition-all duration-500 flex flex-col items-start ${isActuallyRankOne
+          ? 'shadow-[0_0_50px_rgba(250,204,21,0.6)] border-yellow-400/50'
           : 'border-primary/30'
-      }`}>
+        }`}>
         <div className="flex flex-col items-start gap-1 w-full text-left">
-          {isActuallyRankOne ? (
+          {isGameWon ? (
+            <>
+              <Star className="w-12 h-12 text-yellow-400 animate-bounce mb-2" />
+              <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight leading-[0.9] drop-shadow-[0_4px_10px_rgba(255,215,0,0.5)] text-yellow-500 w-full italic">
+                SANN NINJA-MÄSTARE!
+              </h1>
+            </>
+          ) : isActuallyRankOne ? (
             <>
               <Trophy className="w-12 h-12 text-yellow-400 animate-pulse mb-2" />
               <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight leading-none drop-shadow-[0_2px_0_rgba(0,0,0,0.5)] text-yellow-400 w-full">
@@ -113,8 +119,12 @@ export function GameOverView({ playerName, finalScore, ninjaName, isGameWon, isM
             </h1>
           )}
         </div>
-        
-        {isActuallyRankOne ? (
+
+        {isGameWon ? (
+          <p className="text-yellow-400 font-bold animate-pulse uppercase tracking-[0.2em] text-[12px] text-left w-full pl-0.5">
+            Du har besegrat Lord Garmadon och räddat Ninjago!
+          </p>
+        ) : isActuallyRankOne ? (
           <p className="text-yellow-400 font-bold animate-pulse uppercase tracking-[0.2em] text-[11px] text-left w-full pl-0.5">
             DU ÄR NUMMER 1 I VÄRLDEN!
           </p>
@@ -123,7 +133,7 @@ export function GameOverView({ playerName, finalScore, ninjaName, isGameWon, isM
             Du fick {displayScore} poäng. Du behöver öva mer för att nå toppen!
           </p>
         )}
-        
+
         <div className="w-full py-6 rounded-[30px] border-4 border-white/10 bg-black/40">
           <div className="text-6xl font-black font-mono text-primary">
             {displayScore.toLocaleString()}
@@ -131,13 +141,13 @@ export function GameOverView({ playerName, finalScore, ninjaName, isGameWon, isM
           <div className="text-[10px] text-muted-foreground uppercase tracking-widest mt-2 font-black">Poäng</div>
         </div>
 
-        <button 
-            onClick={() => {
-                onReset();
-            }}
-            className="w-full h-20 bg-red-600 text-white text-3xl font-black uppercase rounded-2xl shadow-lg active:translate-y-2 transition-all mt-6"
+        <button
+          onClick={() => {
+            onReset();
+          }}
+          className="w-full h-20 bg-red-600 text-white text-3xl font-black uppercase rounded-2xl shadow-lg active:translate-y-2 transition-all mt-6"
         >
-            Huvudmeny
+          Huvudmeny
         </button>
       </div>
     </div>
