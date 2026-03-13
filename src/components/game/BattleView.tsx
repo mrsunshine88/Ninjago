@@ -70,7 +70,7 @@ export function BattleView({
           {/* Vänster: Nivå */}
           <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
             <span className="text-[10px] md:text-sm text-white/40 font-black uppercase tracking-widest mt-0.5">
-              {isLandscape ? "v3.54 | LS" : "v3.54 | FIXED UI"}
+              {isLandscape ? "v3.55 | STABLE LS" : "v3.55 | FIXED UI"}
             </span>
           </div>
 
@@ -124,6 +124,7 @@ export function BattleView({
           initialScore={isFreshStart ? 0 : initialScore}
           isMuted={isMuted}
           isFreshStart={isFreshStart}
+          isLandscape={isLandscape}
           onLevelComplete={(points) => {
             if (level.number === 7) {
               setShowVictory(true);

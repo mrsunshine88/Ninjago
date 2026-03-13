@@ -16,7 +16,8 @@ interface GameEngineProps {
     playerName: string;
     initialScore: number;
     isMuted: boolean;
-    isFreshStart: boolean;
+    isFreshStart?: boolean;
+    isLandscape?: boolean;
     onGameOver: (score: number) => void;
     onLevelComplete: (points: number) => void;
     onScoreUpdate?: (score: number) => void;
@@ -29,6 +30,7 @@ export function GameEngine({
     initialScore = 0,
     isMuted,
     isFreshStart = false,
+    isLandscape: isLandscapeProp = false,
     onGameOver,
     onLevelComplete,
     onScoreUpdate
@@ -168,14 +170,17 @@ export function GameEngine({
         const checkMobile = () => {
             const mobile = window.innerWidth < 1024 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
             setIsMobile(mobile);
-            setIsLandscape(window.innerWidth > window.innerHeight);
+            // Local state is now just a fallback if prop isn't provided or needed for internal timing
+            setIsLandscapeInternal(window.innerWidth > window.innerHeight);
         };
         checkMobile();
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    const [isLandscape, setIsLandscape] = useState(false);
+    const [isLandscapeInternal, setIsLandscapeInternal] = useState(false);
+    // Prefer the prop if provided, otherwise use internal detection
+    const isLandscape = isLandscapeProp || isLandscapeInternal;
 
     // [v3.01] Återställd SFX-funktion
     const playSFX = (file: string, vol = 0.5) => {
@@ -1409,7 +1414,7 @@ export function GameEngine({
             }
             ctx.filter = 'none'; // [v3.45] Explicit reset
         } catch (err) {
-            console.error('[v3.54] Render Crash Recovered:', err);
+            console.error('[v3.55] Render Crash Recovered:', err);
         }
         raf = requestAnimationFrame(loop);
     };
@@ -1499,55 +1504,62 @@ export function GameEngine({
                 </div>
             )}
 
-            {/* [v3.54] Touch-kontroller optimerade för både Porträtt och Landskap via Portal */}
+            {/* [v3.55] Touch-kontroller optimerade för både Porträtt och Landskap via Portal - Robust Crash Fix */}
             {gameStarted && isMobile && typeof document !== 'undefined' && (
-                createPortal(
-                    <div className={`w-full h-full flex items-end justify-between px-4 pb-4 md:px-8 ${isLandscape ? 'pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]' : ''}`}>
-                        
-                        {/* 1. Vänsterstyrning: Pilar */}
-                        <div className={`flex gap-4 pointer-events-auto items-center ${isLandscape ? 'opacity-40 hover:opacity-100 transition-opacity' : ''}`}>
-                            <button
-                                onPointerDown={(e) => { e.preventDefault(); touch.current.left = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.left = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.left = false; }}
-                                className={`${isLandscape ? 'w-16 h-16' : 'w-16 h-16 md:w-24 md:h-24'} bg-white/10 backdrop-blur-lg rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white`}
-                            >←</button>
-                            <button
-                                onPointerDown={(e) => { e.preventDefault(); touch.current.right = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.right = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.right = false; }}
-                                className={`${isLandscape ? 'w-16 h-16' : 'w-16 h-16 md:w-24 md:h-24'} bg-white/10 backdrop-blur-lg rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white`}
-                            >→</button>
-                        </div>
+                (() => {
+                    const targetId = isLandscape ? 'landscape-controls-root' : 'mobile-controls-root';
+                    const targetElement = document.getElementById(targetId);
+                    
+                    if (!targetElement) return null; // Safe guard against null target during rotation transitions
 
-                        {/* 2. Högerstyrning: [v3.54] CLUSTERED ACTION TRIAD */}
-                        <div className={`flex flex-col items-center gap-1 pointer-events-auto ${isLandscape ? 'opacity-40 hover:opacity-100 transition-opacity mb-2' : ''}`}>
-                            {/* SPIN (🌪️) - Överst centrerad */}
-                            <button
-                                onPointerDown={(e) => { e.preventDefault(); if(spinEnergy >= 100) { state.current.spin = true; state.current.spinT = 150; state.current.energy = 0; } }}
-                                className={`${isLandscape ? 'w-14 h-14' : 'w-14 h-14 md:w-20 md:h-20'} rounded-full border-2 font-black transition-all select-none text-[8px] flex items-center justify-center mb-1 ${spinEnergy >= 100
-                                        ? 'bg-yellow-400 text-black border-yellow-200 shadow-[0_0_20px_#fbbf24] animate-pulse opacity-100'
-                                        : 'bg-black/60 text-white/40 border-white/10 opacity-30 pointer-events-none'
-                                    }`}
-                            >Spin</button>
-
-                            <div className="flex items-center gap-4">
-                                {/* SKJUT (🔥) - Till vänster om Hoppa */}
+                    return createPortal(
+                        <div className={`w-full h-full flex items-end justify-between px-4 pb-4 md:px-8 ${isLandscape ? 'pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]' : ''}`}>
+                            
+                            {/* 1. Vänsterstyrning: Pilar */}
+                            <div className={`flex gap-4 pointer-events-auto items-center ${isLandscape ? 'opacity-40 hover:opacity-100 transition-opacity' : ''}`}>
                                 <button
-                                    onPointerDown={(e) => { e.preventDefault(); state.current.fireReq = true; touch.current.fire = true; }}
-                                    onPointerUp={() => touch.current.fire = false}
-                                    className={`${isLandscape ? 'w-16 h-16' : 'w-16 h-16 md:w-24 md:h-24'} bg-red-600/80 backdrop-blur-lg rounded-full font-black text-[10px] shadow-2xl border-2 border-red-400/30 active:bg-red-600/100 active:opacity-100 opacity-80 transition-all text-white flex flex-col items-center justify-center pt-1`}
-                                >
-                                    <span className="text-xl">🔥</span>
-                                    <span className="uppercase tracking-tighter">Skjut</span>
-                                </button>
-
-                                {/* HOPP (Blå) - Längst till höger */}
+                                    onPointerDown={(e) => { e.preventDefault(); touch.current.left = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.left = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.left = false; }}
+                                    className={`${isLandscape ? 'w-16 h-16' : 'w-16 h-16 md:w-24 md:h-24'} bg-white/10 backdrop-blur-lg rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white`}
+                                >←</button>
                                 <button
-                                    onPointerDown={(e) => { e.preventDefault(); state.current.jumpReq = true; touch.current.jump = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.jump = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.jump = false; }}
-                                    className={`${isLandscape ? 'w-20 h-20' : 'w-20 h-20 md:w-32 md:h-32'} bg-blue-600/80 backdrop-blur-lg rounded-full font-black text-[12px] shadow-2xl border-4 border-blue-400/40 active:bg-blue-600/100 active:opacity-100 opacity-80 transition-all text-white flex items-center justify-center uppercase tracking-widest`}
-                                >HOPPA</button>
+                                    onPointerDown={(e) => { e.preventDefault(); touch.current.right = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.right = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.right = false; }}
+                                    className={`${isLandscape ? 'w-16 h-16' : 'w-16 h-16 md:w-24 md:h-24'} bg-white/10 backdrop-blur-lg rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white`}
+                               >→</button>
                             </div>
-                        </div>
-                    </div>,
-                    document.getElementById(isLandscape ? 'landscape-controls-root' : 'mobile-controls-root')!
-                )
+
+                            {/* 2. Högerstyrning: [v3.55] CLUSTERED ACTION TRIAD */}
+                            <div className={`flex flex-col items-center gap-1 pointer-events-auto ${isLandscape ? 'opacity-40 hover:opacity-100 transition-opacity mb-2' : ''}`}>
+                                {/* SPIN (🌪️) - Överst centrerad */}
+                                <button
+                                    onPointerDown={(e) => { e.preventDefault(); if(spinEnergy >= 100) { state.current.spin = true; state.current.spinT = 150; state.current.energy = 0; } }}
+                                    className={`${isLandscape ? 'w-14 h-14' : 'w-14 h-14 md:w-20 md:h-20'} rounded-full border-2 font-black transition-all select-none text-[8px] flex items-center justify-center mb-1 ${spinEnergy >= 100
+                                            ? 'bg-yellow-400 text-black border-yellow-200 shadow-[0_0_20px_#fbbf24] animate-pulse opacity-100'
+                                            : 'bg-black/60 text-white/40 border-white/10 opacity-30 pointer-events-none'
+                                        }`}
+                                >Spin</button>
+
+                                <div className="flex items-center gap-4">
+                                    {/* SKJUT (🔥) - Till vänster om Hoppa */}
+                                    <button
+                                        onPointerDown={(e) => { e.preventDefault(); state.current.fireReq = true; touch.current.fire = true; }}
+                                        onPointerUp={() => touch.current.fire = false}
+                                        className={`${isLandscape ? 'w-16 h-16' : 'w-16 h-16 md:w-24 md:h-24'} bg-red-600/80 backdrop-blur-lg rounded-full font-black text-[10px] shadow-2xl border-2 border-red-400/30 active:bg-red-600/100 active:opacity-100 opacity-80 transition-all text-white flex flex-col items-center justify-center pt-1`}
+                                    >
+                                        <span className="text-xl">🔥</span>
+                                        <span className="uppercase tracking-tighter">Skjut</span>
+                                    </button>
+
+                                    {/* HOPP (Blå) - Längst till höger */}
+                                    <button
+                                        onPointerDown={(e) => { e.preventDefault(); state.current.jumpReq = true; touch.current.jump = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.jump = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.jump = false; }}
+                                        className={`${isLandscape ? 'w-20 h-20' : 'w-20 h-20 md:w-32 md:h-32'} bg-blue-600/80 backdrop-blur-lg rounded-full font-black text-[12px] shadow-2xl border-4 border-blue-400/40 active:bg-blue-600/100 active:opacity-100 opacity-80 transition-all text-white flex items-center justify-center uppercase tracking-widest`}
+                                    >HOPPA</button>
+                                </div>
+                            </div>
+                        </div>,
+                        targetElement
+                    );
+                })()
             )}
         </div>
     );
