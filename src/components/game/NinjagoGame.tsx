@@ -201,7 +201,7 @@ export default function NinjagoGame() {
   if (!mounted) return null;
 
   return (
-    <main className="min-h-screen bg-black" suppressHydrationWarning={true}>
+    <main className="fixed inset-0 flex flex-col bg-black overflow-hidden touch-none no-select no-touch-callout" suppressHydrationWarning={true}>
       {mounted && (
         <>
           {gameState === 'menu' && (

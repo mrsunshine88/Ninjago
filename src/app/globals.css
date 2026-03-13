@@ -30,16 +30,50 @@
 @layer base {
   * {
     @apply border-border;
+    /* Förhindrar blå rutor vid klick på mobil */
+    -webkit-tap-highlight-color: transparent;
   }
+
+  html,
+  body {
+    @apply overflow-hidden;
+    /* Denna rad är superviktig för mobilvyn */
+    height: 100%;
+    width: 100%;
+    position: fixed;
+    margin: 0;
+    padding: 0;
+    touch-action: none;
+  }
+
   body {
     @apply bg-background text-foreground font-body;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
   }
 }
 
+/* Fix för att spelet ska fylla ut hela skärmen på mobilen */
+main {
+  height: 100vh;
+  height: -webkit-fill-available;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+}
+
 @keyframes slow-zoom {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
 
 .animate-slow-zoom {
@@ -47,14 +81,12 @@
 }
 
 .high-score-text {
-  background: linear-gradient(
-    to right,
-    #bf953f,
-    #fcf6ba,
-    #b38728,
-    #fcf6ba,
-    #bf953f
-  );
+  background: linear-gradient(to right,
+      #bf953f,
+      #fcf6ba,
+      #b38728,
+      #fcf6ba,
+      #bf953f);
   background-size: 200% auto;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -62,8 +94,13 @@
 }
 
 @keyframes gold-shine {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
+  0% {
+    background-position: -200% center;
+  }
+
+  100% {
+    background-position: 200% center;
+  }
 }
 
 .gold-glow {
@@ -71,7 +108,7 @@
 }
 
 .btn-game {
-  @apply relative overflow-hidden transition-all duration-300 transform hover:scale-105 active:scale-95;
+  @apply relative overflow-hidden transition-all duration-300 transform hover:scale-105 active:scale-95 touch-manipulation;
 }
 
 .btn-game::after {
@@ -86,6 +123,9 @@
 canvas {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -111,6 +151,7 @@ canvas {
     -ms-user-select: none;
     user-select: none;
   }
+
   .no-touch-callout {
     -webkit-touch-callout: none;
   }
