@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Flame, Snowflake, Mountain, Zap, Star, Waves, Swords, Volume2, VolumeX } from "lucide-react";
 import { Leaderboard } from "./Leaderboard";
-import { ScoreEntry, getLeaderboard } from "@/lib/leaderboard";
+import { ScoreEntry, getLeaderboard, resetGlobalLeaderboard } from "@/lib/leaderboard";
 
 const ICONS: Record<string, any> = {
   Flame, Snowflake, Mountain, Zap, Star, Waves
@@ -29,7 +29,7 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
 
   useEffect(() => {
     const refreshScores = async () => {
-      console.log("[v1.65] Refreshing leaderboard...");
+      console.log("[v1.89] Refreshing leaderboard...");
       const latest = await getLeaderboard();
       if (latest && latest.length > 0) {
         setLocalScores(latest);
@@ -56,10 +56,15 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
     }
   };
 
-  const handleAdminReset = () => {
+  const handleAdminReset = async () => {
     if (name === "020406") {
-      localStorage.clear();
-      window.location.reload();
+      const ok = confirm("VILL DU VERKLIGEN NOLLSTÄLLA ALLA POÄNG I MOLNET? ⚠️");
+      if (ok) {
+        await resetGlobalLeaderboard();
+        setLocalScores([]);
+        alert("Topplistan har nollställts i molnet! 🥷✅");
+        window.location.reload();
+      }
     } else {
       setIsAdminMode(false);
       setName("");
@@ -162,7 +167,17 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
 
       {/* Mute Toggle Button */}
       <button 
-        onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
+        onClick={(e) => { 
+          e.stopPropagation(); 
+          const newVal = !isMuted;
+          onToggleMute(); 
+          
+          // [v1.87] Master Mute Sync (Mobile safe)
+          if (typeof window !== 'undefined' && (window as any).Howler) {
+            (window as any).Howler.mute(newVal);
+          }
+          console.log("[v1.87] Master Mute set to:", newVal);
+        }}
         onPointerDown={(e) => { e.stopPropagation(); }}
         className={`absolute top-6 right-6 p-4 backdrop-blur-xl border rounded-2xl shadow-2xl z-50 transition-all active:scale-95 group ${
           isMuted 
@@ -291,7 +306,7 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
 
       {/* Version Tag - v1.39, nedre vänster */}
       <div className="absolute bottom-4 left-4 text-white/50 text-[12px] font-black uppercase tracking-[0.2em] z-50 pointer-events-none select-none italic flex items-center gap-2">
-        v1.77 <span className={`w-1.5 h-1.5 rounded-full bg-green-500`} title="Stealth Key Active" />
+        v1.89 <span className={`w-1.5 h-1.5 rounded-full bg-green-500`} title="Stealth Key Active" />
       </div>
       {/* Credit Text - alltid centrerat längst ned, krockar ej med version */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[#FFD700] text-[11px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] z-50 pointer-events-none select-none whitespace-nowrap">

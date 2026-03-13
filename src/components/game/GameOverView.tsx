@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ScoreEntry } from "@/lib/leaderboard";
 import { Button } from "@/components/ui/button";
 import { RefreshCcw, Star, Trophy } from "lucide-react";
 
@@ -9,12 +10,13 @@ interface GameOverViewProps {
   finalScore: number;
   isHighScore: boolean;
   isGameWon?: boolean;
+  leaderboard: ScoreEntry[];
   isMuted: boolean;
   onReset: () => void;
   onRetry?: () => void;
 }
 
-export function GameOverView({ playerName, finalScore, isHighScore, isGameWon, isMuted, onReset, onRetry }: GameOverViewProps) {
+export function GameOverView({ playerName, finalScore, isHighScore, isGameWon, leaderboard, isMuted, onReset, onRetry }: GameOverViewProps) {
   const [countdown, setCountdown] = useState(20);
   const [displayScore, setDisplayScore] = useState(0);
   const [particles, setParticles] = useState<any[]>([]);
@@ -41,13 +43,26 @@ export function GameOverView({ playerName, finalScore, isHighScore, isGameWon, i
       }));
       setParticles(newParticles);
       
-      const audioFile = isHighScore 
-        ? "/audio/SPELA UPP NÄR MAN SLÅR REKORD.mp3" 
-        : "/audio/music_level_complete_8bit.wav";
-      
-      const audio = new Audio(audioFile);
-      audio.volume = isMuted ? 0 : 0.6;
-      audio.play().catch(() => {});
+      // [v1.88] World Record Celebration Sound
+      if (isHighScore && !isMuted) {
+        try {
+            // Vi använder window.Howl för att undvika import-fel om paketet inte är installerat
+            const recordSound = new (window as any).Howl({
+                src: ['/audio/SPELA UPP NÄR MAN SLÅR REKORD.mp3'],
+                autoplay: true,
+                volume: 0.8
+            });
+        } catch (e) {
+            // Fallback till vanlig Audio
+            const audio = new Audio("/audio/SPELA UPP NÄR MAN SLÅR REKORD.mp3");
+            audio.volume = 0.8;
+            audio.play().catch(() => {});
+        }
+      } else if (isGameWon && !isMuted) {
+        const audio = new Audio("/audio/music_level_complete_8bit.wav");
+        audio.volume = 0.6;
+        audio.play().catch(() => {});
+      }
     }
 
     return () => clearInterval(timer);
@@ -75,9 +90,12 @@ export function GameOverView({ playerName, finalScore, isHighScore, isGameWon, i
       ))}
 
       <div className="z-10 bg-card/70 backdrop-blur-3xl p-8 rounded-[40px] border-4 border-primary/30 shadow-2xl space-y-4 max-w-md w-full">
-        <h1 className="text-5xl font-black uppercase text-white">
-          {isHighScore ? "NYTT REKORD!" : "BRA KÄMPAT!"}
+        <h1 className={`${isHighScore ? "text-yellow-400 text-6xl animate-bounce" : "text-white text-5xl"} font-black uppercase`}>
+          {isHighScore ? "🏆 NYTT VÄRLDSREKORD! 🏆" : "BRA KÄMPAT!"}
         </h1>
+        {isHighScore && (
+            <p className="text-white text-2xl font-black uppercase tracking-tighter">Du är nu nummer 1!</p>
+        )}
         
         <div className="py-6 rounded-[30px] border-4 border-white/10 bg-black/40">
           <div className="text-6xl font-black font-mono text-primary">

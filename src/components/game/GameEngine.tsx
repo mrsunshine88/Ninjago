@@ -131,7 +131,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
         if (typeof window !== 'undefined' && state.current.score === 0) {
             const saved = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
             if (saved > 0) {
-                console.log(`[v1.49] Recovered score from storage: ${saved}`);
+                console.log(`[v1.89] Recovered score from storage: ${saved}`);
                 state.current.score = saved;
                 state.current.lastReportedScore = saved;
                 setCurrentScore(saved);
@@ -140,7 +140,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
     };
     loadLB();
 
-    // [v1.82] EXPERT DEVICE DETECTION
+    // [v1.89] EXPERT DEVICE DETECTION
     const checkDevice = () => {
         const hasTouch = (typeof window !== 'undefined') && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
         const isSmall = (typeof window !== 'undefined') && (window.innerWidth < 1024);
@@ -479,7 +479,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                 localStorage.setItem('ninjago_emergency_score', String(s.score));
             }
             
-            // Camera (Fixed v1.55: Bi-directional following)
+            // Camera (Fixed v1.89: Bi-directional following)
             const targetX = s.x - 300;
             s.cameraX = Math.min(Math.max(0, targetX), level.length - 800);
             s.energy = Math.min(100, s.energy + 0.2); 
@@ -545,7 +545,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
             if (Math.abs((s.x + 70) - coin.x) < 70 && Math.abs((s.y + 80) - coin.y) < 80) {
                 coin.collected = true;
                 s.score += 50;
-                s.maxScore = Math.max(s.maxScore, s.score); // v1.55
+                s.maxScore = Math.max(s.maxScore, s.score); // v1.89
                 s.lastReportedScore = s.maxScore;
                 if (typeof window !== 'undefined') localStorage.setItem('ninjago_emergency_score', String(s.maxScore));
                 setCurrentScore(s.score);
@@ -637,7 +637,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
         if (s.y > 600 && s.active) { 
             s.active = false;
             const finalS = Math.max(Number(s.score) || 0, Number(s.maxScore) || 0);
-            console.log(`[v1.59] Fall Death. Final Score: ${finalS}`);
+            console.log(`[v1.89] Fall Death. Final Score: ${finalS}`);
             setCurrentScore(finalS);
             onGameOverRef.current(finalS); 
         }
@@ -682,7 +682,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                     s.comboTimer = 120; // 2 sekunder
                     const bonus = s.combo > 1 ? s.combo * 50 : 0;
                     s.score += 100 + bonus;
-                    s.maxScore = Math.max(s.maxScore, s.score); // v1.55
+                    s.maxScore = Math.max(s.maxScore, s.score); // v1.89
                     s.lastReportedScore = s.maxScore; // Sync ref
                     if (typeof window !== 'undefined' && s.y > 700) localStorage.setItem('ninjago_emergency_score', String(s.maxScore));
                     if (s.combo > 1) {
@@ -715,7 +715,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                         let finalScoreBackup = 0;
                         if (typeof window !== 'undefined') finalScoreBackup = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
                         const finalS = Math.max(Number(s.maxScore) || 0, s.lastReportedScore || 0, Number(localStorage.getItem('ninjago_emergency_score')) || 0);
-                        console.log(`[v1.65] Game Over (Enemy). Final: ${finalS}`);
+                        console.log(`[v1.89] Game Over (Enemy). Final: ${finalS}`);
                         setCurrentScore(finalS);
                         setTimeout(() => onGameOverRef.current(finalS), 1500);
                     } else {
@@ -807,7 +807,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                         let finalScoreBackup = 0;
                         if (typeof window !== 'undefined') finalScoreBackup = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
                         const finalS = Math.max(Number(s.maxScore) || 0, s.lastReportedScore || 0, finalScoreBackup);
-                        console.log(`[v1.65] Game Over (Proj). Final: ${finalS}`);
+                        console.log(`[v1.89] Game Over (Proj). Final: ${finalS}`);
                         setCurrentScore(finalS);
                         setTimeout(() => onGameOverRef.current(finalS), 1500);
                     } else {
@@ -912,7 +912,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                     s.active = false;
                     playSFX('lolo_s-down-474082.mp3', 1.0); 
                     const finalS = Math.max(Number(s.maxScore) || 0, s.lastReportedScore || 0, Number(localStorage.getItem('ninjago_emergency_score')) || 0);
-                    console.log(`[v1.65] Game Over (Boss Touch). Final: ${finalS}`);
+                    console.log(`[v1.82] Game Over (Boss Touch). Final: ${finalS}`);
                     setCurrentScore(finalS);
                     setTimeout(() => onGameOverRef.current(finalS), 1500);
                 }

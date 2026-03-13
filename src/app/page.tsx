@@ -42,7 +42,7 @@ export default function NinjagoGame() {
 
   // [v1.82] MASTER AUDIO SYNC
   useEffect(() => {
-    console.log("[v1.82] Master Audio Sync. Muted:", isMuted);
+    console.log("[v1.89] Master Audio Sync. Muted:", isMuted);
     
     // Backup: Muta alla HTML5 Audio-element direkt
     if (typeof document !== 'undefined') {
@@ -52,16 +52,35 @@ export default function NinjagoGame() {
       });
     }
 
-    // Om det finns några framtida bibliotek som Howler (inget än, men bra att ha)
+    // [v1.87] Master Mute Sync (Mobile safe)
     if (typeof window !== 'undefined' && (window as any).Howler) {
       (window as any).Howler.mute(isMuted);
     }
   }, [isMuted]);
 
+  // [v1.87] SCROLL UNLOCK LOGIC
+  useEffect(() => {
+    if (gameState === 'menu') {
+      // Tvinga fram fri skrollning när vi är i menyn
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = 'auto';
+        document.body.style.position = 'static';
+        document.body.style.height = 'auto';
+        document.body.style.touchAction = 'auto';
+        document.body.style.overscrollBehavior = 'auto';
+        
+        // Avsluta fullskärm om den hänger kvar
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    }
+  }, [gameState]);
+
 
   const finishGame = useCallback(async (total: number, isWin: boolean = false) => {
     setGameOverData(null); // Clear old data first
-    console.log(`[v1.66] Finishing game with score: ${total}. Awaiting save...`);
+    console.log(`[v1.89] Finishing game with score: ${total}. Awaiting save...`);
     
     // 1. Spara först (vänta på nätverket)
     const result = await saveScore({
@@ -76,7 +95,7 @@ export default function NinjagoGame() {
     const freshLeaderboard = await getLeaderboard();
     setLeaderboard(freshLeaderboard);
     setGameState('gameover');
-    console.log(`[v1.66] Save confirmed & Leaderboard refreshed.`);
+    console.log(`[v1.89] Save confirmed & Leaderboard refreshed.`);
   }, [playerName, selectedNinja]);
 
   const handleStart = useCallback((name: string, ninja: Ninja) => {
@@ -101,11 +120,11 @@ export default function NinjagoGame() {
   }, [currentLevelIdx, finishGame]);
 
   const handleGameOver = useCallback(async (totalScore: number) => {
-    // v1.57 Expert Sync: Ensure we have the absolute max score
+    // v1.89 Expert Sync: Ensure we have the absolute max score
     const currentStored = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
     const finalS = Math.max(score, totalScore, currentStored);
     
-    console.log(`[v1.57] handleGameOver triggered. Score: ${finalS}. Awaiting finishGame...`);
+    console.log(`[v1.89] handleGameOver triggered. Score: ${finalS}. Awaiting finishGame...`);
     setScore(finalS); // Update local state for display
     await finishGame(finalS); // This function now awaits the network call
   }, [score, finishGame]);
@@ -175,6 +194,7 @@ export default function NinjagoGame() {
           finalScore={gameOverData.score} 
           isHighScore={gameOverData.isHighScore} 
           isGameWon={gameOverData.isWin}
+          leaderboard={leaderboard}
           isMuted={isMuted}
           onReset={handleReset}
           onRetry={handleRetry} 

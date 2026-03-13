@@ -7,12 +7,12 @@ export interface ScoreEntry {
 }
 
 import { db } from "./firebase";
-import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, writeBatch } from "firebase/firestore";
 
-console.log("[v1.73] Database Project ID:", db.app.options.projectId);
+console.log("[v1.89] Database Project ID:", db.app.options.projectId);
 
 export async function getLeaderboard(): Promise<ScoreEntry[]> {
-    // [v1.73] Global Sync: Force cloud fetch, NO local fallback
+    // [v1.89] Global Sync: Force cloud fetch, NO local fallback
   try {
     const scoresCol = collection(db, "scores");
     const snapshot = await getDocs(scoresCol);
@@ -31,9 +31,9 @@ export async function getLeaderboard(): Promise<ScoreEntry[]> {
     
     // Sortera lokalt (Client-side sort) - v1.73 krav
     const sorted = data.sort((a, b) => Number(b.score) - Number(a.score));
-    console.log(`[v1.73] Global Sync: Found ${sorted.length} scores from cloud`);
+    console.log(`[v1.89] Global Sync: Found ${sorted.length} scores from cloud`);
     
-    // v1.73: Returnerar tom lista om molnet är tomt
+    // v1.89: Returnerar tom lista om molnet är tomt
     return sorted.slice(0, 10);
   } catch (error) {
     console.error("Global Leaderboard Error:", error);
@@ -53,7 +53,7 @@ export async function saveScore(entry: ScoreEntry): Promise<{ isHighScore: boole
   const currentLeaderboard = await getLeaderboard();
   const currentBest = currentLeaderboard.length > 0 ? currentLeaderboard[0].score : 0;
 
-  console.log(`[v1.74] Global Sync Save. Best: ${currentBest}, New: ${entry.score}`);
+  console.log(`[v1.89] Global Sync Save. Best: ${currentBest}, New: ${entry.score}`);
 
   // 2. Spara till Firestore (Global Collection: scores)
   try {
@@ -67,12 +67,29 @@ export async function saveScore(entry: ScoreEntry): Promise<{ isHighScore: boole
     console.error("Firestore save error:", e);
   }
 
-  // 3. v1.75: Rank 1 Check (Använd > för att säkerställa att man faktiskt SLÅR rekordet)
+  // 3. v1.82: Rank 1 Check (Använd > för att säkerställa att man faktiskt SLÅR rekordet)
   const isNewGlobalBest = entry.score > currentBest && entry.score > 0;
   const isFirstEver = currentLeaderboard.length === 0 && entry.score > 0;
   const isRank1 = isNewGlobalBest || isFirstEver;
   
-  console.log(`[v1.75] Rank 1 Check: ${isRank1 ? 'YES (Celebration!)' : 'NO'}`);
+  console.log(`[v1.89] Rank 1 Check: ${isRank1 ? 'YES (Celebration!)' : 'NO'}`);
   
   return { isHighScore: isRank1 };
+}
+
+export async function resetGlobalLeaderboard() {
+  try {
+    const scoresCol = collection(db, "scores");
+    const snapshot = await getDocs(scoresCol);
+    const batch = writeBatch(db);
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+    console.log("[v1.89] Global Leaderboard Wiped by Admin");
+    return true;
+  } catch (e) {
+    console.error("Failed to reset leaderboard:", e);
+    return false;
+  }
 }
