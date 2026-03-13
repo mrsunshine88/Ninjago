@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Ninja, Level } from '@/lib/game-data';
 import { getLeaderboard } from '@/lib/leaderboard';
 import { Howl } from 'howler';
+import { createPortal } from 'react-dom';
 
 interface Particle {
     x: number; y: number; dx: number; dy: number;
@@ -1418,12 +1419,12 @@ export function GameEngine({
         <div
             ref={containerRef}
             className={`relative w-full overflow-hidden bg-black no-select no-touch-callout ${isMobile
-                    ? 'fixed inset-0 z-[10000] h-[100dvh] w-[100dvw]'
+                    ? 'h-full w-full'
                     : 'aspect-video rounded-3xl border-4 border-white/10 shadow-2xl h-full'
                 }`}
             style={{ touchAction: 'none' }}
         >
-            <canvas ref={canvasRef} width={800} height={600} className="w-full h-full object-cover md:object-contain" />
+            <canvas ref={canvasRef} width={800} height={600} className="w-full h-full object-contain" />
 
             {/* Nivå Intro Overlay */}
             {showLevelIntro && (
@@ -1495,63 +1496,52 @@ export function GameEngine({
                 </div>
             )}
 
-            {/* [v2.11] Touch-kontroller optimerade för STÅENDE LÄGE */}
-            {gameStarted && isMobile && (
-                <>
-                    {/* Vänsterstyrning: Pilar - [v3.50] Cornered & Transparent */}
-                    <div className="absolute bottom-4 left-4 md:bottom-8 md:left-8 flex gap-4 pointer-events-auto z-[3000] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
+            {/* [v3.53] Touch-kontroller optimerade för bottenpanelen via Portal */}
+            {gameStarted && isMobile && typeof document !== 'undefined' && document.getElementById('mobile-controls-root') && createPortal(
+                <div className="w-full h-full flex items-center justify-between px-4 pb-4 md:px-8">
+                    {/* Vänsterstyrning: Pilar */}
+                    <div className="flex gap-4 pointer-events-auto items-center">
                         <button
                             onPointerDown={(e) => { e.preventDefault(); touch.current.left = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.left = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.left = false; }}
-                            className="w-16 h-16 md:w-24 md:h-24 bg-white/10 backdrop-blur-lg rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white opacity-50 active:opacity-100 transition-opacity"
+                            className="w-16 h-16 md:w-24 md:h-24 bg-white/10 backdrop-blur-lg rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white opacity-60 active:opacity-100 transition-opacity"
                         >←</button>
                         <button
                             onPointerDown={(e) => { e.preventDefault(); touch.current.right = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.right = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.right = false; }}
-                            className="w-16 h-16 md:w-24 md:h-24 bg-white/10 backdrop-blur-lg rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white opacity-50 active:opacity-100 transition-opacity"
+                            className="w-16 h-16 md:w-24 md:h-24 bg-white/10 backdrop-blur-lg rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white opacity-60 active:opacity-100 transition-opacity"
                         >→</button>
                     </div>
 
-                    {/* Vänsterstyrning: Pilar - [v3.52] Positioned slightly above footer */}
-                    <div className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 md:bottom-24 md:left-8 flex gap-3 pointer-events-auto z-[3000] pl-[env(safe-area-inset-left)]">
-                        <button
-                            onPointerDown={(e) => { e.preventDefault(); touch.current.left = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.left = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.left = false; }}
-                            className="w-14 h-14 md:w-24 md:h-24 bg-white/10 backdrop-blur-lg rounded-xl flex items-center justify-center text-2xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white opacity-40 active:opacity-100 transition-opacity"
-                        >←</button>
-                        <button
-                            onPointerDown={(e) => { e.preventDefault(); touch.current.right = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.right = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.right = false; }}
-                            className="w-14 h-14 md:w-24 md:h-24 bg-white/10 backdrop-blur-lg rounded-xl flex items-center justify-center text-2xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white opacity-40 active:opacity-100 transition-opacity"
-                        >→</button>
-                    </div>
-
-                    {/* Högerstyrning: [v3.52] CLUSTERED ACTION TRIAD - Consistent with user reference */}
-                    <div className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 md:bottom-24 md:right-8 flex flex-col items-center gap-2 pointer-events-auto z-[3000] pr-[env(safe-area-inset-right)]">
-                        
+                    {/* Högerstyrning: [v3.53] CLUSTERED ACTION TRIAD - Optimized for Portrait Flow */}
+                    <div className="flex flex-col items-center gap-1 pointer-events-auto">
                         {/* SPIN (🌪️) - Överst centrerad */}
                         <button
                             onPointerDown={(e) => { e.preventDefault(); if(spinEnergy >= 100) { state.current.spin = true; state.current.spinT = 150; state.current.energy = 0; } }}
-                            className={`w-12 h-12 md:w-20 md:h-20 rounded-full border-2 font-black transition-all select-none text-[8px] flex items-center justify-center mb-1 ${spinEnergy >= 100
+                            className={`w-14 h-14 md:w-20 md:h-20 rounded-full border-2 font-black transition-all select-none text-[8px] flex items-center justify-center mb-1 ${spinEnergy >= 100
                                     ? 'bg-yellow-400 text-black border-yellow-200 shadow-[0_0_20px_#fbbf24] animate-pulse opacity-100'
                                     : 'bg-black/60 text-white/40 border-white/10 opacity-30 pointer-events-none'
                                 }`}
                         >Spin</button>
 
-                        {/* Nedre raden: Skjut & Hopp */}
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-4">
+                            {/* SKJUT (🔥) - Till vänster om Hoppa */}
                             <button
                                 onPointerDown={(e) => { e.preventDefault(); state.current.fireReq = true; touch.current.fire = true; }}
                                 onPointerUp={() => touch.current.fire = false}
-                                className="w-16 h-16 md:w-24 md:h-24 bg-red-600/60 backdrop-blur-lg rounded-full font-black text-[9px] shadow-2xl border-2 border-red-400/30 active:bg-red-600/90 active:opacity-100 opacity-60 transition-all text-white flex flex-col items-center justify-center gap-0.5 uppercase tracking-tighter"
+                                className="w-16 h-16 md:w-24 md:h-24 bg-red-600/80 backdrop-blur-lg rounded-full font-black text-[10px] shadow-2xl border-2 border-red-400/30 active:bg-red-600/100 active:opacity-100 opacity-80 transition-all text-white flex flex-col items-center justify-center pt-1"
                             >
                                 <span className="text-xl">🔥</span>
-                                <span className="leading-none">Skjut</span>
+                                <span className="uppercase tracking-tighter">Skjut</span>
                             </button>
 
+                            {/* HOPP (Blå) - Längst till höger */}
                             <button
                                 onPointerDown={(e) => { e.preventDefault(); state.current.jumpReq = true; touch.current.jump = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.jump = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.jump = false; }}
-                                className="w-20 h-20 md:w-32 md:h-32 bg-blue-600/60 backdrop-blur-lg rounded-full font-black text-[10px] shadow-2xl border-4 border-blue-400/30 active:bg-blue-600/90 active:opacity-100 opacity-60 transition-all text-white flex items-center justify-center uppercase tracking-[0.1em] scale-110"
+                                className="w-20 h-20 md:w-32 md:h-32 bg-blue-600/80 backdrop-blur-lg rounded-full font-black text-[12px] shadow-2xl border-4 border-blue-400/40 active:bg-blue-600/100 active:opacity-100 opacity-80 transition-all text-white flex items-center justify-center uppercase tracking-widest"
                             >HOPPA</button>
                         </div>
                     </div>
-                </>
+                </div>,
+                document.getElementById('mobile-controls-root')!
             )}
         </div>
     );

@@ -59,7 +59,7 @@ export function BattleView({
           
           {/* Vänster: Nivå */}
           <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
-            <span className="text-[10px] md:text-sm text-white/40 font-black uppercase tracking-widest mt-0.5">v3.52 | Fixed UI</span>
+            <span className="text-[10px] md:text-sm text-white/40 font-black uppercase tracking-widest mt-0.5">v3.53 | FIXED UI</span>
           </div>
 
           {/* Mitten: Poäng & Ljud */}
@@ -102,8 +102,8 @@ export function BattleView({
         </div>
       </div>
 
-      {/* Game Engine */}
-      <div className="flex-1 relative w-full overflow-hidden flex items-center justify-center bg-black">
+      {/* Game Engine - [v3.53] Zoom-out container */}
+      <div className="flex-1 relative w-full overflow-hidden flex items-start md:items-center justify-center bg-black portrait:max-h-[50dvh]">
         <GameEngine
           key={`${level.number}-${ninja.id}-${retryCount}`}
           ninja={ninja}
@@ -150,19 +150,25 @@ export function BattleView({
         </div>
       )}
 
-      {/* Footer Status Bar - [v3.52] Restored visibility to match reference image */}
-      <div className="flex w-full bg-[#1a0f0f] border-t border-white/10 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] px-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] items-center gap-4 h-auto min-h-20 z-[1000] relative shrink-0">
-        <div className="bg-[#2a9d8f]/20 p-2 md:p-3 rounded-xl md:rounded-2xl border border-[#2a9d8f]/30 shrink-0">
-          <Heart className="w-5 h-5 md:w-7 md:h-7 text-[#2a9d8f] fill-[#2a9d8f]/30" />
-        </div>
-        <div className="flex flex-col flex-1">
-          <span className="text-[9px] md:text-[10px] text-[#2a9d8f] font-black uppercase tracking-[0.2em]">Status</span>
-          <span className="text-[11px] md:text-sm font-bold text-white/90 italic leading-tight tracking-wide line-clamp-2">
-            Besegra {level.boss.name || 'bossen'} för att nå nästa nivå!
-          </span>
+      {/* [v3.53] Footer / Bottom Control Panel - High priority on mobile */}
+      <div className="flex w-full bg-[#0a0a0a] border-t border-white/10 p-2 md:p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] px-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] items-center gap-4 h-[40dvh] md:h-auto md:min-h-20 z-[1000] relative shrink-0">
+        {/* Status Info (Hidden on mobile controls panel if overlapping, but kept here for now) */}
+        <div className="hidden md:flex items-center gap-4">
+          <div className="bg-[#2a9d8f]/20 p-2 md:p-3 rounded-xl md:rounded-2xl border border-[#2a9d8f]/30 shrink-0">
+            <Heart className="w-5 h-5 md:w-7 md:h-7 text-[#2a9d8f] fill-[#2a9d8f]/30" />
+          </div>
+          <div className="flex flex-col flex-1 min-w-[120px]">
+            <span className="text-[9px] md:text-[10px] text-[#2a9d8f] font-black uppercase tracking-[0.2em]">Status</span>
+            <span className="text-[11px] md:text-sm font-bold text-white/90 italic leading-tight tracking-wide line-clamp-2">
+              Besegra {level.boss.name || 'bossen'} för att nå nästa nivå!
+            </span>
+          </div>
         </div>
 
-        {/* Desktop Controls Legend - Hidden on mobile */}
+        {/* [v3.53] Mobile Controls Panel will be injected here by GameEngine portal or just positioned via GameEngine */}
+        <div id="mobile-controls-root" className="flex-1 h-full" />
+
+        {/* Desktop Controls Legend */}
         <div className="hidden lg:flex flex-col items-end border-l border-white/10 pl-6">
           <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.2em] mb-1">Kontroller (Dator)</span>
           <div className="flex gap-4 text-[11px] font-black text-white/90 italic tracking-wider">
