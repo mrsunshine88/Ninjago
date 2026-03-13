@@ -118,7 +118,7 @@ export function GameEngine({
             images.current[key] = img;
         });
 
-        const bossFiles = ['overlord.png', 'stor drake.png', 'lila svart stor orm.png', 'storm arg orm.png', 'grön demon.png', 'lila svart monster.png'];
+        const bossFiles = ['overlord.png', 'stor drake.png', 'lila svart stor orm.png', 'storm arg orm.png', 'grön demon.png', 'lila svart monster.png', 'Lord Garmadon.png'];
         [...monsterFiles, ...bossFiles].forEach(f => {
             const img = new Image();
             img.src = `/${encodeURIComponent(f)}`;
@@ -292,18 +292,8 @@ export function GameEngine({
             }
             state.current.enemies = enemies;
 
-            let bossImg = 'overlord.png';
-            if (level.number === 1) bossImg = 'stor drake.png';
-            else if (level.number === 2) bossImg = 'lila svart stor orm.png';
-            else if (level.number === 3) bossImg = 'storm arg orm.png';
-            else if (level.number === 4) bossImg = 'grön demon.png';
-            else if (level.number === 5) bossImg = 'lila svart monster.png';
-            else if (level.number === 6 && !images.current['overlord']) bossImg = 'fiender ond.png'; // Fallback om bilden saknas
-
-            // Om overlord.png saknas, använd fallback
-            if (level.number === 6) bossImg = 'overlord.png';
-            if (level.number === 7) bossImg = 'Lord Garmadon.png';
-
+            // [v3.47] Use standardized image key from game-data
+            const bossImg = level.boss.imageKey || 'overlord.png';
             // Bossens HP: [v2.80] Massive Increase
             let bossHP = 1000;
             if (level.number === 2) bossHP = 2000;
@@ -312,9 +302,7 @@ export function GameEngine({
             else if (level.number === 5) bossHP = 5000;
             else if (level.number === 6) bossHP = 7500;
             else if (level.number === 7) bossHP = 10000;
-            // Boss 1 = 100, Boss 6 = 600. Regular enemies 1-2 hits.
 
-            // Flytta bossen till len - 400 så den hamnar på höger sida och spelaren ser den komma
             state.current.boss = {
                 x: len - 400,
                 y: 100,
@@ -373,6 +361,11 @@ export function GameEngine({
 
         const loop = (timestamp: number) => {
             if (!state.current.active) return;
+            try {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d', { alpha: false });
+                if (!ctx) return;
 
             // [v2.57] DeltaTime calculation
             const dt = lastTimestamp.current ? Math.min(2.0, (timestamp - lastTimestamp.current) / (1000 / 60)) : 1;
@@ -623,7 +616,7 @@ export function GameEngine({
             s.particles.forEach((p, i) => {
                 p.x += p.dx; p.y += p.dy; p.life--;
                 if (p.life <= 0) { s.particles.splice(i, 1); return; }
-                // Optimering: Rita bara partiklar som syns på skärmen
+                // [v3.45] Performance Culling: Skip particles off-screen
                 if (p.x < s.cameraX - 100 || p.x > s.cameraX + 900) return;
                 ctx.fillStyle = p.color;
                 if (p.type === 'vortex') { ctx.shadowBlur = 10; ctx.shadowColor = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; }
@@ -814,8 +807,11 @@ export function GameEngine({
                     }
                 }
 
+                // [v3.45] Performance Culling: Skip rendering if far off-screen
+                const isOnScreen = e.x > s.cameraX - 200 && e.x < s.cameraX + 1000;
+                
                 const mImg = images.current[e.img];
-                if (mImg?.complete && mImg.naturalWidth > 0) {
+                if (isOnScreen && mImg?.complete && mImg.naturalWidth > 0) {
                     if (!cleanedImages.current[e.img]) {
                         const canvas = document.createElement('canvas');
                         canvas.width = mImg.naturalWidth; canvas.height = mImg.naturalHeight;
@@ -824,7 +820,10 @@ export function GameEngine({
                             tempCtx.drawImage(mImg, 0, 0);
                             const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
                             const data = imageData.data;
-                            for (let j = 0; j < data.length; j += 4) { if (data[j] > 230 && data[j + 1] > 230 && data[j + 2] > 230) data[j + 3] = 0; }
+                            for (let j = 0; j < data.length; j += 4) { 
+                                // [v3.42] Catch near-white pixels to remove outlines
+                                if (data[j] > 220 && data[j + 1] > 220 && data[j + 2] > 220) data[j + 3] = 0; 
+                            }
                             tempCtx.putImageData(imageData, 0, 0); cleanedImages.current[e.img] = canvas;
                         }
                     }
@@ -846,6 +845,8 @@ export function GameEngine({
                         ctx.fillText('!', e.x + e.w / 2, e.y - 20);
                         ctx.restore();
                     }
+                } else if (!isOnScreen) {
+                   // No draw
                 } else { ctx.fillStyle = "#8b5cf6"; ctx.fillRect(e.x, e.y, e.w, e.h); }
 
                 // Kollisionshantering spelare <-> fiende
@@ -1057,7 +1058,7 @@ export function GameEngine({
                 }
             }
 
-            if (s.x > level.length - 1800) {
+            if (s.x > level.length - 1000) {
                 const b = s.boss;
                 b.attackCd -= dt;
                 if (b.attackCd <= 0 && s.freezeTime <= 0) {
@@ -1101,8 +1102,8 @@ export function GameEngine({
                         });
                     }
 
-                    // [v2.93] Linear Difficulty: Base CD 80, drops faster per level, stays tight
-                    s.boss.attackCd = Math.max(10, 80 - lvlNum * 12);
+                    // [v3.42] Linear Difficulty scaling: Lv1 is slow, Lv6 is fast
+                    s.boss.attackCd = Math.max(15, 120 - (lvlNum * 16));
                     // [v2.42] Drenched Effect: Shoot 50% slower (Double Cd)
                     if (b.drenchedT > 0) {
                         s.boss.attackCd *= 2;
@@ -1324,35 +1325,53 @@ export function GameEngine({
                 }
 
                 if (b.hitT > 0) b.hitT -= dt;
-                const bImg = images.current[b.img];
-                if (bImg?.complete && bImg.naturalWidth > 0) {
+                // [v3.45] Boss Rendering Stabilization
+                const isBossOnScreen = s.boss.x > s.cameraX - 500 && s.boss.x < s.cameraX + 1100;
+                const bImage = images.current[b.img];
+
+                if (isBossOnScreen && bImage?.complete && bImage.naturalWidth > 0) {
                     if (!cleanedImages.current[b.img]) {
                         const canvas = document.createElement('canvas');
-                        canvas.width = bImg.naturalWidth; canvas.height = bImg.naturalHeight;
+                        canvas.width = bImage.naturalWidth; canvas.height = bImage.naturalHeight;
                         const tempCtx = canvas.getContext('2d');
                         if (tempCtx) {
-                            tempCtx.drawImage(bImg, 0, 0);
+                            tempCtx.drawImage(bImage, 0, 0);
                             const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
                             const data = imageData.data;
-                            for (let j = 0; j < data.length; j += 4) { if (data[j] > 230 && data[j + 1] > 230 && data[j + 2] > 230) data[j + 3] = 0; }
+                            for (let j = 0; j < data.length; j += 4) { 
+                                 if (data[j] > 220 && data[j + 1] > 220 && data[j + 2] > 220) data[j + 3] = 0; 
+                            }
                             tempCtx.putImageData(imageData, 0, 0);
                             cleanedImages.current[b.img] = canvas;
                         }
                     }
-                    const cleanedBossImg = cleanedImages.current[b.img] || bImg;
+                    const isGarmadon = b.img.toLowerCase().includes('garmadon');
+                    const cleanedBImg = cleanedImages.current[b.img] || bImage;
                     ctx.save();
-                    if (b.hitT % 2 === 1) ctx.filter = 'brightness(2) sepia(1) hue-rotate(-50deg) saturate(5)';
+                    try {
+                        if (b.hitT % 2 === 1) ctx.filter = 'brightness(2) sepia(1) hue-rotate(-50deg) saturate(5)';
+                        
+                        if (isGarmadon) {
+                            ctx.translate(b.x + b.w / 2, b.y + b.h / 2);
+                            ctx.scale(Math.cos(timestamp / 500) * 0.1 + 1, 1);
+                            ctx.translate(-(b.x + b.w / 2), -(b.y + b.h / 2));
+                        }
 
-                    // [v3.11/v3.19] Universal Boss Flip (Levels 2-7) 
-                    // Training Robot (L1) stays default.
-                    if (level.number >= 2) {
-                        ctx.translate(b.x + b.w, b.y);
-                        ctx.scale(-1, 1);
-                        ctx.drawImage(cleanedBossImg, 0, 0, b.w, b.h);
-                    } else {
-                        ctx.drawImage(cleanedBossImg, b.x, b.y, b.w, b.h);
+                        // [v3.11/v3.19] Universal Boss Flip (Levels 2-7) 
+                        if (level.number >= 2) {
+                            ctx.translate(b.x + b.w, b.y);
+                            ctx.scale(-1, 1);
+                            ctx.drawImage(cleanedBImg, 0, 0, b.w, b.h);
+                        } else {
+                            ctx.drawImage(cleanedBImg, b.x, b.y, b.w, b.h);
+                        }
+                    } finally {
+                        ctx.restore();
                     }
-                    ctx.restore();
+                } else if (isBossOnScreen) {
+                    // [v3.45] Placeholder for loading state
+                    ctx.fillStyle = "#4c1d95";
+                    ctx.fillRect(b.x, b.y, b.w, b.h);
                 }
 
                 // Boss HP Bar & Name - VISAS BARA NÄR BOSSEN ÄR SYNLIG
@@ -1364,7 +1383,7 @@ export function GameEngine({
                     ctx.fillText(`${Math.ceil(b.hp)} / ${b.max} HP`, s.cameraX + 400, 50);
                     ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.strokeRect(s.cameraX + 200, 30, 400, 30);
                     ctx.fillStyle = "white"; ctx.font = "black 18px Orbitron, sans-serif"; ctx.textAlign = "center";
-                    const bossName = level.number === 6 ? "THE OVERLORD" : b.img.toUpperCase().replace('.PNG', '');
+                    const bossName = level.boss.name.toUpperCase();
                     ctx.fillText(bossName, s.cameraX + 400, 52);
                 }
             }
@@ -1384,8 +1403,12 @@ export function GameEngine({
                 setDisplayTime(s.timeLeft);
                 setLives(s.lives);
             }
-            raf = requestAnimationFrame(loop);
-        };
+            ctx.filter = 'none'; // [v3.45] Explicit reset
+        } catch (err) {
+            console.error('[v3.45] Render Crash Recovered:', err);
+        }
+        raf = requestAnimationFrame(loop);
+    };
 
         raf = requestAnimationFrame(loop);
         return () => cancelAnimationFrame(raf);
@@ -1474,38 +1497,38 @@ export function GameEngine({
             {/* [v2.11] Touch-kontroller optimerade för STÅENDE LÄGE */}
             {gameStarted && isMobile && (
                 <>
-                    {/* Vänsterstyrning: Pilar - [v3.24] Lyfta högre (bottom-40) */}
-                    <div className="absolute bottom-6 left-4 flex gap-2 pointer-events-auto z-[3000]">
+                    {/* Vänsterstyrning: Pilar - [v3.48] Safe Area Support */}
+                    <div className="absolute bottom-[calc(2.5rem+env(safe-area-inset-bottom))] left-[calc(1rem+env(safe-area-inset-left))] flex gap-2 pointer-events-auto z-[3000]">
                         <button
                             onPointerDown={(e) => { e.preventDefault(); touch.current.left = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.left = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.left = false; }}
-                            className="w-16 h-16 bg-black/50 backdrop-blur-xl rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/40 text-white"
+                            className="w-16 h-16 bg-black/60 backdrop-blur-xl rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/40 text-white"
                         >←</button>
                         <button
                             onPointerDown={(e) => { e.preventDefault(); touch.current.right = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.right = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.right = false; }}
-                            className="w-16 h-16 bg-black/50 backdrop-blur-xl rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/40 text-white"
+                            className="w-16 h-16 bg-black/60 backdrop-blur-xl rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/40 text-white"
                         >→</button>
                     </div>
 
-                    {/* Högerstyrning: [v3.24] Lyfta högre (bottom-40) */}
-                    <div className="absolute bottom-6 right-4 flex items-end gap-3 pointer-events-auto z-[3000]">
+                    {/* Högerstyrning: [v3.48] Safe Area Support */}
+                    <div className="absolute bottom-[calc(2.5rem+env(safe-area-inset-bottom))] right-[calc(1rem+env(safe-area-inset-right))] flex items-end gap-3 pointer-events-auto z-[3000]">
                         <div className="flex flex-col items-center gap-3">
-                            {/* SPIN (🌪️) */}
+                            {/* SPIN (🌪️) - Överst (Ovanför Skjut) */}
                             <button
                                 onPointerDown={(e) => { e.preventDefault(); touch.current.spin = true; }}
-                                className={`w-14 h-14 rounded-full border-2 font-black transition-all select-none text-[8px] tracking-widest flex items-center justify-center ${spinEnergy >= 100
+                                className={`w-20 h-20 rounded-full border-4 font-black transition-all select-none text-[10px] tracking-widest flex items-center justify-center ${spinEnergy >= 100
                                         ? 'bg-yellow-400 text-black border-yellow-200 shadow-[0_0_20px_#fbbf24] animate-pulse'
                                         : 'bg-yellow-600/40 text-white/70 border-yellow-500/30'
                                     }`}
                             >SPIN</button>
 
-                            {/* SKJUT (🔥) - Röd (Flyttad till vänster om hopp) */}
+                            {/* SKJUT (🔥) - Röd (Flyttad till mitten-gruppen) */}
                             <button
                                 onPointerDown={(e) => { e.preventDefault(); touch.current.fire = true; }}
                                 className="w-20 h-20 bg-red-600/90 backdrop-blur-xl rounded-full font-black text-3xl shadow-2xl border-4 border-red-400/50 active:scale-90 transition-transform text-white flex items-center justify-center"
                             >🔥</button>
                         </div>
 
-                        {/* HOPP (Blå) - Längst till höger */}
+                        {/* HOPP (Blå) - Bytt plats med skjut (Nu längst till höger) */}
                         <button
                             onPointerDown={(e) => { e.preventDefault(); touch.current.jump = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.jump = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.jump = false; }}
                             className="w-20 h-20 bg-blue-600/90 backdrop-blur-xl rounded-full font-black text-[10px] shadow-2xl border-4 border-blue-400/50 active:scale-90 transition-transform text-white flex items-center justify-center uppercase tracking-widest"

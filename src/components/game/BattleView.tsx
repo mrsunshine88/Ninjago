@@ -167,15 +167,27 @@ export function BattleView({
       )}
 
       {/* Footer Status Bar */}
-      <div className="w-full bg-[#1a0f0f]/95 backdrop-blur-2xl border-t border-white/10 p-4 flex items-center gap-4 h-24 sm:h-20 z-[1000] relative">
+      <div className="w-full bg-[#1a0f0f]/95 backdrop-blur-2xl border-t border-white/10 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] px-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] flex items-center gap-4 h-auto min-h-24 sm:min-h-20 z-[1000] relative">
         <div className="bg-[#2a9d8f]/20 p-3 rounded-2xl border border-[#2a9d8f]/30 ring-1 ring-[#2a9d8f]/20">
           <Heart className="w-7 h-7 text-[#2a9d8f] fill-[#2a9d8f]/30" />
         </div>
-        <div className="flex flex-col">
+        <div className="flex flex-col flex-1">
           <span className="text-[10px] text-[#2a9d8f] font-black uppercase tracking-[0.2em]">Status</span>
           <span className="text-sm font-bold text-white italic leading-tight tracking-wide">
             Besegra bossen för att gå vidare!
           </span>
+        </div>
+
+        {/* [v3.46] Desktop Controls Legend */}
+        <div className="hidden md:flex flex-col items-end border-l border-white/10 pl-6">
+          <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.2em] mb-1">Kontroller (Dator)</span>
+          <div className="flex gap-4 text-[11px] font-black text-white/90 italic tracking-wider">
+            <span>MELLANSLAG = <span className="text-blue-400">HOPPA</span></span>
+            <span className="text-white/20">|</span>
+            <span>X = <span className="text-red-500">SKJUTA</span></span>
+            <span className="text-white/20">|</span>
+            <span>Z = <span className="text-yellow-400">SPIN</span></span>
+          </div>
         </div>
       </div>
     </div>

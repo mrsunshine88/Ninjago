@@ -1,12 +1,14 @@
-
 "use client";
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-import dynamic from 'next/dynamic';
+
+import nextDynamic from 'next/dynamic';
 
 
 
-const DynamicGame = dynamic(() => import('@/components/game/NinjagoGame'), {
+const DynamicGame = nextDynamic(() => import('@/components/game/NinjagoGame'), {
 
   ssr: false,
 
