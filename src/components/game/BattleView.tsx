@@ -53,69 +53,52 @@ export function BattleView({
 
   return (
     <div className="h-[100dvh] flex flex-col bg-black text-white overflow-hidden animate-in fade-in duration-500">
-      {/* HEADER */}
-      <div className="w-full flex justify-between items-center bg-[#2d1b1b]/80 p-4 border-b border-white/5 backdrop-blur-xl z-[500]">
-        <div className="flex flex-col">
-          <span className="text-[10px] text-muted-foreground uppercase font-black tracking-[0.2em]">Nivå</span>
-          <span className="text-3xl md:text-4xl font-black text-[#ff2e63] italic leading-none">{level?.number || 1} / 7</span>
-        </div>
-
-        <div className="flex items-center gap-4">
-          {/* [v3.15] Manual Fullscreen Toggle */}
-          <Button
-            variant="outline"
-            onClick={(e) => {
-              e.stopPropagation();
-              const elem = document.documentElement as any;
-              if (elem.requestFullscreen) elem.requestFullscreen();
-              else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
-              else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
-            }}
-            className="h-12 w-12 rounded-xl border-2 bg-white/10 border-white/20 hover:bg-white/20"
-            title="Helskärm"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 text-yellow-400">
-              <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-            </svg>
-          </Button>
-          {/* [v2.14] Live HUD Score */}
-          <div className="flex flex-col items-end mr-2">
-            <span className="text-[9px] text-accent font-black uppercase tracking-[0.2em] leading-none mb-1">Poäng</span>
-            <span className="text-2xl md:text-3xl font-black text-white italic leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-              {(liveScore || 0).toLocaleString()}
-            </span>
+      {/* [v3.50] HUD OVERLAY - Absolute and transparent to maximize view space */}
+      <div className="absolute top-0 inset-x-0 z-[500] pointer-events-none">
+        <div className="w-full flex justify-between items-center bg-gradient-to-b from-black/60 to-transparent p-2 md:p-4 pointer-events-auto">
+          <div className="flex flex-col">
+            <span className="text-[8px] md:text-[10px] text-white/60 uppercase font-black tracking-[0.2em]">Nivå</span>
+            <span className="text-xl md:text-4xl font-black text-[#ff2e63] italic leading-none">{level?.number || 1} / 7</span>
           </div>
 
-          <Button
-            variant="outline"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (typeof onToggleMute === 'function') {
-                onToggleMute();
-              }
-            }}
-            className={`h-12 w-12 rounded-xl border-2 ${isMuted ? "bg-red-500/20 border-red-500/50" : "bg-white/10 border-white/20"}`}
-          >
-            {isMuted ? <VolumeX className="w-6 h-6 text-red-500" /> : <Volume2 className="w-6 h-6 text-green-500" />}
-          </Button>
+          <div className="flex items-center gap-2 md:gap-4">
+            {/* [v3.50] Compressed UI for mobile */}
+            <div className="flex flex-col items-end mr-1 md:mr-2">
+              <span className="text-[8px] text-accent font-black uppercase tracking-[0.2em] leading-none mb-1">Poäng</span>
+              <span className="text-lg md:text-3xl font-black text-white italic leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                {(liveScore || 0).toLocaleString()}
+              </span>
+            </div>
 
-          <Button
-            variant="destructive"
-            onClick={onAbort}
-            className="bg-[#e63946] hover:bg-red-700 text-white font-black uppercase tracking-widest px-6 h-12 rounded-xl border-b-4 border-[#780116] active:border-0 active:translate-y-1 transition-all flex items-center gap-2 shadow-xl"
-          >
-            <LogOut className="w-5 h-5" />
-            AVSLUTA
-          </Button>
+            <Button
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (typeof onToggleMute === 'function') onToggleMute();
+              }}
+              className={`h-9 w-9 md:h-12 md:w-12 rounded-lg md:rounded-xl border-2 p-0 ${isMuted ? "bg-red-500/20 border-red-500/50" : "bg-white/10 border-white/20"}`}
+            >
+              {isMuted ? <VolumeX className="w-5 h-5 md:w-6 md:h-6 text-red-500" /> : <Volume2 className="w-5 h-5 md:w-6 md:h-6 text-green-500" />}
+            </Button>
+
+            <Button
+              variant="destructive"
+              onClick={onAbort}
+              className="bg-[#e63946] hover:bg-red-700 text-white font-black uppercase tracking-widest px-3 md:px-6 h-9 md:h-12 rounded-lg md:rounded-xl border-b-4 border-[#780116] active:border-0 active:translate-y-1 transition-all flex items-center gap-2 shadow-xl text-[10px] md:text-base"
+            >
+              <LogOut className="w-4 h-4 hidden md:block" />
+              AVSLUTA
+            </Button>
+          </div>
         </div>
-      </div>
 
-      {/* Progress Bar */}
-      <div className="w-full h-3 bg-black/40 relative overflow-hidden">
-        <div
-          className="h-full bg-gradient-to-r from-[#ff2e63] to-[#ff4d6d] shadow-[0_0_15px_#ff2e63]"
-          style={{ width: `${((level?.number || 1) / 7) * 100}%` }}
-        />
+        {/* Progress Bar Moved Inside Overlay */}
+        <div className="w-full h-1 md:h-2 bg-black/20 relative overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-[#ff2e63] to-[#ff4d6d] shadow-[0_0_10px_#ff2e63]"
+            style={{ width: `${((level?.number || 1) / 7) * 100}%` }}
+          />
+        </div>
       </div>
 
       {/* Game Engine */}
@@ -166,20 +149,20 @@ export function BattleView({
         </div>
       )}
 
-      {/* Footer Status Bar */}
-      <div className="w-full bg-[#1a0f0f]/95 backdrop-blur-2xl border-t border-white/10 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] px-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] flex items-center gap-4 h-auto min-h-24 sm:min-h-20 z-[1000] relative">
+      {/* Footer Status Bar - [v3.50] Hidden on mobile to maximize gameplay space */}
+      <div className="hidden md:flex w-full bg-[#1a0f0f]/95 backdrop-blur-2xl border-t border-white/10 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] px-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] items-center gap-4 h-auto min-h-24 sm:min-h-20 z-[1000] relative">
         <div className="bg-[#2a9d8f]/20 p-3 rounded-2xl border border-[#2a9d8f]/30 ring-1 ring-[#2a9d8f]/20">
           <Heart className="w-7 h-7 text-[#2a9d8f] fill-[#2a9d8f]/30" />
         </div>
         <div className="flex flex-col flex-1">
           <span className="text-[10px] text-[#2a9d8f] font-black uppercase tracking-[0.2em]">Status</span>
-          <span className="text-sm font-bold text-white italic leading-tight tracking-wide">
+          <span className="text-xs md:text-sm font-bold text-white italic leading-tight tracking-wide">
             Besegra bossen för att gå vidare!
           </span>
         </div>
 
-        {/* [v3.46] Desktop Controls Legend */}
-        <div className="hidden md:flex flex-col items-end border-l border-white/10 pl-6">
+        {/* Desktop Controls Legend */}
+        <div className="hidden lg:flex flex-col items-end border-l border-white/10 pl-6">
           <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.2em] mb-1">Kontroller (Dator)</span>
           <div className="flex gap-4 text-[11px] font-black text-white/90 italic tracking-wider">
             <span>MELLANSLAG = <span className="text-blue-400">HOPPA</span></span>

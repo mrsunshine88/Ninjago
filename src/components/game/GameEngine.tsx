@@ -1405,7 +1405,7 @@ export function GameEngine({
             }
             ctx.filter = 'none'; // [v3.45] Explicit reset
         } catch (err) {
-            console.error('[v3.45] Render Crash Recovered:', err);
+            console.error('[v3.50] Render Crash Recovered:', err);
         }
         raf = requestAnimationFrame(loop);
     };
@@ -1418,11 +1418,12 @@ export function GameEngine({
         <div
             ref={containerRef}
             className={`relative w-full overflow-hidden bg-black no-select no-touch-callout ${isMobile
-                    ? 'fixed inset-0 z-[10000] h-[100dvh]'
+                    ? 'fixed inset-0 z-[10000] h-[100dvh] w-[100dvw]'
                     : 'aspect-video rounded-3xl border-4 border-white/10 shadow-2xl h-full'
                 }`}
+            style={{ touchAction: 'none' }}
         >
-            <canvas ref={canvasRef} width={800} height={600} className="w-full h-full object-contain" />
+            <canvas ref={canvasRef} width={800} height={600} className="w-full h-full object-cover md:object-contain" />
 
             {/* Nivå Intro Overlay */}
             {showLevelIntro && (
@@ -1457,37 +1458,37 @@ export function GameEngine({
             )}
 
             {gameStarted && (
-                <div className="absolute top-4 inset-x-4 z-[200] flex justify-between items-start pointer-events-none">
-                    {/* [v3.10] Ninja Icon with GLOW effect */}
-                    <div className="relative">
-                        <div className={`w-14 h-14 rounded-full border-2 overflow-hidden bg-black/40 ${spinEnergy >= 100 ? 'border-yellow-400 shadow-[0_0_20px_#fbbf24] scale-110 active:scale-95 transition-all' : 'border-white/20'}`}>
-                            <img src={`/${ninja.id}.png`} className="w-full h-full object-cover" alt={ninja.name} />
+                <div className="absolute inset-0 z-[200] pointer-events-none">
+                    {/* [v3.50] TOP LEFT: Ninja + HP (Hearts) */}
+                    <div className="absolute top-2 left-2 md:top-4 md:left-4 flex flex-col gap-1 items-start pointer-events-auto">
+                        <div className="flex items-center gap-2">
+                            <div className={`w-10 h-10 md:w-14 md:h-14 rounded-full border-2 overflow-hidden bg-black/40 ${spinEnergy >= 100 ? 'border-yellow-400 shadow-[0_0_20px_#fbbf24]' : 'border-white/20'}`}>
+                                <img src={`/${ninja.id}.png`} className="w-full h-full object-cover" alt={ninja.name} />
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[8px] font-black text-white/40 uppercase tracking-widest leading-none mb-0.5">{ninja.name}</span>
+                                <div className="flex gap-0.5 text-sm md:text-2xl">
+                                    {[1, 2, 3].map(i => (
+                                        <span key={i} className={i <= lives ? 'text-red-500 drop-shadow-[0_0_6px_red]' : 'text-white/10'}>
+                                            {i <= lives ? '❤️' : '🖤'}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
-                        {spinEnergy >= 100 && (
-                            <div className="absolute -top-2 -right-2 bg-yellow-400 text-black text-[10px] font-black px-1.5 rounded-full animate-bounce">Z</div>
-                        )}
                     </div>
 
-                    {/* Spin-energi i mitten */}
-                    <div className="absolute left-1/2 -translate-x-1/2 top-2 flex flex-col items-center gap-0.5">
-                        <div className="text-[8px] font-black text-white/30 tracking-[0.2em] uppercase">Spinjitzu (Z)</div>
-                        <div className={`${isMobile ? 'w-24 h-2.5' : 'w-48 h-5'} bg-black/40 rounded-full border border-white/10 overflow-hidden relative`}>
+                    {/* [v3.50] TOP CENTER: Spin-energi */}
+                    <div className="absolute left-1/2 -translate-x-1/2 top-10 md:top-2 flex flex-col items-center gap-0.5">
+                        <div className="text-[7px] md:text-[8px] font-black text-white/30 tracking-[0.2em] uppercase">Spinjitzu (Z)</div>
+                        <div className={`${isMobile ? 'w-20 h-1.5' : 'w-48 h-5'} bg-black/40 rounded-full border border-white/10 overflow-hidden relative`}>
                             <div className={`h-full transition-all duration-300 ${spinEnergy >= 100 ? 'bg-yellow-400' : 'bg-blue-500'}`} style={{ width: `${spinEnergy}%` }} />
                         </div>
                     </div>
 
-                    {/* Liv + Tid – höger sida */}
-                    <div className="flex flex-col items-end gap-1">
-                        {/* Hjärtan – liv */}
-                        <div className={`flex gap-0.5 ${isMobile ? 'text-xl' : 'text-3xl'}`}>
-                            {[1, 2, 3].map(i => (
-                                <span key={i} className={i <= lives ? 'text-red-500 drop-shadow-[0_0_6px_red]' : 'text-white/20'}>
-                                    {i <= lives ? '❤️' : '🖤'}
-                                </span>
-                            ))}
-                        </div>
-                        {/* Timer */}
-                        <div className={`px-3 py-0.5 bg-black/40 backdrop-blur-md rounded-lg border ${displayTime < 30 ? 'border-red-500 text-red-500' : 'border-white/10 text-white'} font-black shadow-xl ${isMobile ? 'text-base' : 'text-2xl'}`}>
+                    {/* [v3.50] TOP RIGHT: Timer */}
+                    <div className="absolute top-2 right-2 md:top-4 md:right-4 pointer-events-auto">
+                        <div className={`px-2 py-0.5 md:px-3 md:py-1 bg-black/40 backdrop-blur-md rounded-lg border ${displayTime < 30 ? 'border-red-500 text-red-500' : 'border-white/10 text-white'} font-black shadow-xl text-xs md:text-2xl`}>
                             {displayTime}s
                         </div>
                     </div>
@@ -1497,41 +1498,42 @@ export function GameEngine({
             {/* [v2.11] Touch-kontroller optimerade för STÅENDE LÄGE */}
             {gameStarted && isMobile && (
                 <>
-                    {/* Vänsterstyrning: Pilar - [v3.48] Safe Area Support */}
-                    <div className="absolute bottom-[calc(2.5rem+env(safe-area-inset-bottom))] left-[calc(1rem+env(safe-area-inset-left))] flex gap-2 pointer-events-auto z-[3000]">
+                    {/* Vänsterstyrning: Pilar - [v3.50] Cornered & Transparent */}
+                    <div className="absolute bottom-4 left-4 md:bottom-8 md:left-8 flex gap-4 pointer-events-auto z-[3000] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
                         <button
                             onPointerDown={(e) => { e.preventDefault(); touch.current.left = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.left = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.left = false; }}
-                            className="w-16 h-16 bg-black/60 backdrop-blur-xl rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/40 text-white"
+                            className="w-16 h-16 md:w-24 md:h-24 bg-white/10 backdrop-blur-lg rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white opacity-50 active:opacity-100 transition-opacity"
                         >←</button>
                         <button
                             onPointerDown={(e) => { e.preventDefault(); touch.current.right = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.right = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.right = false; }}
-                            className="w-16 h-16 bg-black/60 backdrop-blur-xl rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/40 text-white"
+                            className="w-16 h-16 md:w-24 md:h-24 bg-white/10 backdrop-blur-lg rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/30 text-white opacity-50 active:opacity-100 transition-opacity"
                         >→</button>
                     </div>
 
-                    {/* Högerstyrning: [v3.48] Safe Area Support */}
-                    <div className="absolute bottom-[calc(2.5rem+env(safe-area-inset-bottom))] right-[calc(1rem+env(safe-area-inset-right))] flex items-end gap-3 pointer-events-auto z-[3000]">
-                        <div className="flex flex-col items-center gap-3">
-                            {/* SPIN (🌪️) - Överst (Ovanför Skjut) */}
+                    {/* Högerstyrning: [v3.50] Cornered, Transparent & Safe Areas */}
+                    <div className="absolute bottom-4 right-4 md:bottom-8 md:right-8 flex items-end gap-3 pointer-events-auto z-[3000] pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)]">
+                        <div className="flex flex-col items-center gap-6">
+                            {/* SPIN (🌪️) - Överst */}
                             <button
-                                onPointerDown={(e) => { e.preventDefault(); touch.current.spin = true; }}
-                                className={`w-20 h-20 rounded-full border-4 font-black transition-all select-none text-[10px] tracking-widest flex items-center justify-center ${spinEnergy >= 100
-                                        ? 'bg-yellow-400 text-black border-yellow-200 shadow-[0_0_20px_#fbbf24] animate-pulse'
-                                        : 'bg-yellow-600/40 text-white/70 border-yellow-500/30'
+                                onPointerDown={(e) => { e.preventDefault(); if(spinEnergy >= 100) { state.current.spin = true; state.current.spinT = 150; state.current.energy = 0; } }}
+                                className={`w-16 h-16 md:w-20 md:h-20 rounded-full border-2 font-black transition-all select-none text-[8px] flex items-center justify-center ${spinEnergy >= 100
+                                        ? 'bg-yellow-400 text-black border-yellow-200 shadow-[0_0_20px_#fbbf24] animate-pulse opacity-100'
+                                        : 'bg-yellow-600/20 text-white/50 border-yellow-500/10 opacity-30 pointer-events-none'
                                     }`}
                             >SPIN</button>
 
-                            {/* SKJUT (🔥) - Röd (Flyttad till mitten-gruppen) */}
+                            {/* SKJUT (🔥) */}
                             <button
-                                onPointerDown={(e) => { e.preventDefault(); touch.current.fire = true; }}
-                                className="w-20 h-20 bg-red-600/90 backdrop-blur-xl rounded-full font-black text-3xl shadow-2xl border-4 border-red-400/50 active:scale-90 transition-transform text-white flex items-center justify-center"
+                                onPointerDown={(e) => { e.preventDefault(); state.current.fireReq = true; touch.current.fire = true; }}
+                                onPointerUp={() => touch.current.fire = false}
+                                className="w-16 h-16 md:w-20 md:h-20 bg-red-600/30 backdrop-blur-lg rounded-full font-black text-2xl shadow-2xl border-2 border-red-400/20 active:bg-red-600/60 active:opacity-100 opacity-40 transition-all text-white flex items-center justify-center"
                             >🔥</button>
                         </div>
 
-                        {/* HOPP (Blå) - Bytt plats med skjut (Nu längst till höger) */}
+                        {/* HOPP (Blå) */}
                         <button
-                            onPointerDown={(e) => { e.preventDefault(); touch.current.jump = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.jump = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.jump = false; }}
-                            className="w-20 h-20 bg-blue-600/90 backdrop-blur-xl rounded-full font-black text-[10px] shadow-2xl border-4 border-blue-400/50 active:scale-90 transition-transform text-white flex items-center justify-center uppercase tracking-widest"
+                            onPointerDown={(e) => { e.preventDefault(); state.current.jumpReq = true; touch.current.jump = true; }} onPointerUp={(e) => { e.preventDefault(); touch.current.jump = false; }} onPointerLeave={(e) => { e.preventDefault(); touch.current.jump = false; }}
+                            className="w-20 h-20 md:w-28 md:h-28 bg-blue-600/30 backdrop-blur-lg rounded-full font-black text-[10px] shadow-2xl border-2 border-blue-400/20 active:bg-blue-600/60 active:opacity-100 opacity-40 transition-all text-white flex items-center justify-center uppercase tracking-widest"
                         >HOPP</button>
                     </div>
                 </>

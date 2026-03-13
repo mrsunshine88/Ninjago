@@ -202,19 +202,19 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute, isNyaUnloc
         onClick={handleLogoClick}
       >
         <div className="inline-block p-1 bg-white/10 rounded-full mb-2 backdrop-blur-md border border-white/20 shadow-2xl overflow-hidden">
-          <img src="/icon.png" alt="Ninjago" className="w-32 h-32 object-cover rounded-full" />
+          <img src="/icon.png" alt="Ninjago" className="w-20 h-20 md:w-32 md:h-32 object-cover rounded-full" />
         </div>
-        <h1 className="text-6xl md:text-8xl font-black tracking-tighter uppercase italic high-score-text drop-shadow-[0_5px_15px_rgba(0,0,0,0.8)]">
+        <h1 className="text-4xl md:text-8xl font-black tracking-tighter uppercase italic high-score-text drop-shadow-[0_5px_15px_rgba(0,0,0,0.8)]">
           Ninjago
         </h1>
-        <p className="text-2xl text-accent font-black tracking-[0.3em] uppercase drop-shadow-md">
+        <p className="text-lg md:text-2xl text-accent font-black tracking-[0.3em] uppercase drop-shadow-md">
           Elemental Clash
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 w-full max-w-7xl items-start z-10">
-        <div className="space-y-8">
-          <div className="space-y-6 bg-black/60 backdrop-blur-2xl p-8 rounded-[32px] border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 w-full max-w-7xl items-start z-10 mb-20 md:mb-0">
+        <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6 bg-black/60 backdrop-blur-2xl p-4 md:p-8 rounded-[32px] border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
             <div className="space-y-3">
               <Label htmlFor="name" className="text-xl font-black text-white uppercase tracking-widest">
                 {isAdminMode ? "LÖSENORD:" : "Ditt Ninja-namn"}
@@ -229,10 +229,9 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute, isNyaUnloc
               />
             </div>
 
-            {/* [v3.23] Structural Stability: Div is always in DOM but hidden via CSS */}
-            <div className={`space-y-4 pt-4 transition-all ${(!isAdminMode && isMounted) ? 'opacity-100 scale-100 block' : 'opacity-0 scale-95 hidden pointer-events-none'}`}>
-              <Label className="text-xl font-black text-white uppercase tracking-widest">Välj din Ninja</Label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className={`space-y-4 pt-2 transition-all ${(!isAdminMode && isMounted) ? 'opacity-100 scale-100 block' : 'opacity-0 scale-95 hidden pointer-events-none'}`}>
+              <Label className="text-lg md:text-xl font-black text-white uppercase tracking-widest text-center block">Välj din Ninja</Label>
+              <div className="grid grid-cols-3 md:grid-cols-3 gap-2 md:gap-4">
                 {NINJAS.map((ninja) => {
                   const IconComp = ICONS[ninja.icon] || Flame;
                   const isSelected = selectedNinja?.id === ninja.id;
@@ -340,9 +339,14 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute, isNyaUnloc
           </div>
         </div>
 
-        <div className="w-full lg:max-w-md space-y-4">
+        {/* [v3.49] Leaderboard - Hidden on small mobile screens to save space during setup */}
+        <div className="hidden sm:block">
           <Leaderboard scores={localScores} />
         </div>
+      </div>
+
+      <div className="fixed bottom-4 right-4 text-[10px] text-white/20 font-black tracking-widest uppercase">
+        v3.50 | Optimized for Mobile
       </div>
 
       {/* Bottom info row - [v3.46] Stack on mobile to avoid overlap */}
