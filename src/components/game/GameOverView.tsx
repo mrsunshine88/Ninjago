@@ -87,7 +87,9 @@ export function GameOverView({ playerName, finalScore, isHighScore, isGameWon, i
         </div>
 
         <button 
-            onClick={onReset}
+            onClick={() => {
+                onReset();
+            }}
             className="w-full h-20 bg-red-600 text-white text-3xl font-black uppercase rounded-2xl shadow-lg active:translate-y-2 transition-all mt-6"
         >
             Huvudmeny

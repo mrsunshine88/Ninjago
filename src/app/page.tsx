@@ -40,6 +40,24 @@ export default function NinjagoGame() {
     });
   }, []);
 
+  // [v1.82] MASTER AUDIO SYNC
+  useEffect(() => {
+    console.log("[v1.82] Master Audio Sync. Muted:", isMuted);
+    
+    // Backup: Muta alla HTML5 Audio-element direkt
+    if (typeof document !== 'undefined') {
+      const allAudio = document.querySelectorAll('audio');
+      allAudio.forEach(audio => {
+        audio.muted = isMuted;
+      });
+    }
+
+    // Om det finns några framtida bibliotek som Howler (inget än, men bra att ha)
+    if (typeof window !== 'undefined' && (window as any).Howler) {
+      (window as any).Howler.mute(isMuted);
+    }
+  }, [isMuted]);
+
 
   const finishGame = useCallback(async (total: number, isWin: boolean = false) => {
     setGameOverData(null); // Clear old data first
@@ -102,13 +120,23 @@ export default function NinjagoGame() {
     setGameState('playing');
   }, []);
 
-  const handleReset = useCallback(() => {
+  const handleReset = useCallback(async () => {
+    // Avsluta fullskärm om den är aktiv
+    if (typeof document !== 'undefined' && document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+    
     document.body.style.overflow = '';
     document.body.style.touchAction = '';
     document.body.style.overscrollBehavior = '';
+    
     setScore(0);
     setRetryCount(0);
     setGameState('menu');
+
+    // Extra synk för topplistan vid återgång till menyn
+    const freshScores = await getLeaderboard();
+    setLeaderboard(freshScores);
   }, []);
 
   const handleAbort = useCallback(() => {

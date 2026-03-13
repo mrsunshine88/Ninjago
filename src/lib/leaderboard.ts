@@ -7,7 +7,7 @@ export interface ScoreEntry {
 }
 
 import { db } from "./firebase";
-import { collection, addDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "firebase/firestore";
 
 console.log("[v1.73] Database Project ID:", db.app.options.projectId);
 
@@ -58,8 +58,10 @@ export async function saveScore(entry: ScoreEntry): Promise<{ isHighScore: boole
   // 2. Spara till Firestore (Global Collection: scores)
   try {
     await addDoc(collection(db, "scores"), {
-      ...entry,
-      timestamp: new Date()
+      name: entry.name,
+      ninja: entry.ninja,
+      score: Number(entry.score),
+      timestamp: serverTimestamp()
     });
   } catch (e) {
     console.error("Firestore save error:", e);

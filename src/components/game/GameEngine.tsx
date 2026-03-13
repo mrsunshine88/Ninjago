@@ -103,8 +103,6 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
   };
 
   useEffect(() => {
-    setIsMobile(window.innerWidth < 1024);
-    
     state.current.initDone = false;
     setGameStarted(false);
     setShowLevelIntro(true); // Visa nivå-introduktion
@@ -112,7 +110,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
     // Visa nivå-introduktion i 3 sekunder, starta sedan (eller visa startknapp)
     const timer = setTimeout(() => {
         setShowLevelIntro(false);
-        if (level.number > 1) {
+        if (level && level.number > 1) {
             setGameStarted(true);
         }
     }, 3000);
@@ -141,6 +139,15 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
         }
     };
     loadLB();
+
+    // [v1.82] EXPERT DEVICE DETECTION
+    const checkDevice = () => {
+        const hasTouch = (typeof window !== 'undefined') && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+        const isSmall = (typeof window !== 'undefined') && (window.innerWidth < 1024);
+        setIsMobile(hasTouch && isSmall);
+    };
+    checkDevice();
+    window.addEventListener('resize', checkDevice);
 
     const heroFiles = ['kai.png', 'Jay.png', 'zane.png', 'Cole.png', 'Lloyd.png', 'Nya.png'];
     heroFiles.forEach(f => {
@@ -182,7 +189,13 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
         state.current.active = false; 
         window.removeEventListener('keydown', kd);
         window.removeEventListener('keyup', ku);
+        window.removeEventListener('resize', checkDevice);
         if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+        // Tvinga webbläsaren att tillåta skrollning igen vid avmontering
+        if (typeof document !== 'undefined') {
+            document.body.style.overflow = 'auto';
+            document.body.style.position = 'static';
+        }
     };
   }, [level, ninja]);
 
@@ -419,8 +432,8 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                 const playerFeetOld = oldY + ninjaH;
                 const playerFeetNew = newY + ninjaH;
                 
-                // Mark-kollision
-                if (s.dy >= 0 && playerFeetOld <= plat.y + 5 && playerFeetNew >= plat.y) {
+                // [v1.81] One-Way Platform Logic: Landa bara om vi faller neråt och var ovanför
+                if (s.dy >= 0 && playerFeetOld <= plat.y + 10 && playerFeetNew >= plat.y) {
                     if (s.dy > 5) {
                         s.shake = s.dy * 0.5;
                         for(let k=0; k<8; k++) s.particles.push({ 
@@ -434,10 +447,24 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                     s.jump = false; 
                     onGround = true; 
                 }
-                // Tak-kollision
-                else if (s.dy < 0 && s.y > plat.y + plat.h - 20 && s.y < plat.y + plat.h + 20) {
+                // Tak-kollision (Hoppa igenom om det inte är marken - i detta spel är marken första plattformen)
+                // Vi tillåter "enkelriktat" hopp igenom alla plattformar UTOM marken (plat index 0)
+                else if (s.dy < 0 && s.plats.indexOf(plat) === 0 && s.y > plat.y + plat.h - 20 && s.y < plat.y + plat.h + 20) {
                     s.y = plat.y + plat.h + 2;
                     s.dy = 0.5;
+                }
+            }
+        });
+
+        // [v1.81] UNSTUCK LOGIC
+        s.plats.forEach(plat => {
+            if (s.x + 40 < plat.x + plat.w && s.x + ninjaW - 40 > plat.x) {
+                if (s.y + ninjaH - 10 > plat.y && s.y + 10 < plat.y + plat.h) {
+                    // Om spelaren är inuti en plattform, knuffa uppåt (om det inte är marken)
+                    // (Vi kollar om fötterna är djupt inne i plattformen)
+                    if (s.y + ninjaH > plat.y + 15 && s.plats.indexOf(plat) !== 0) {
+                        s.y -= 5;
+                    }
                 }
             }
         });
@@ -550,7 +577,12 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
             let enemyOnGround = false;
             s.plats.forEach(plat => {
                 if (e.x + 10 < plat.x + plat.w && e.x + e.w - 10 > plat.x) {
-                    if (e.y + e.h > plat.y && e.y + e.h < plat.y + 40 + e.dy) { e.y = plat.y - e.h; e.dy = 0; enemyOnGround = true; }
+                    // [v1.81] Enemy Platform Collision (One-Way)
+                    if (e.dy >= 0 && e.y + e.h > plat.y && e.y + e.h < plat.y + 15 + e.dy) { 
+                        e.y = plat.y - e.h; 
+                        e.dy = 0; 
+                        enemyOnGround = true; 
+                    }
                 }
             });
             const dist = (s.x + 70) - (e.x + 50);
@@ -945,7 +977,11 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
   return (
     <div 
         ref={containerRef}
-        className={`relative w-full h-full overflow-hidden bg-black no-select no-touch-callout ${!isMobile ? 'aspect-[16/9] rounded-3xl border-4 border-white/10 shadow-2xl' : ''}`}
+        className={`relative w-full overflow-hidden bg-black no-select no-touch-callout ${
+            isMobile 
+            ? 'fixed inset-0 z-[10000] h-[100dvh]' 
+            : 'aspect-video rounded-3xl border-4 border-white/10 shadow-2xl h-full'
+        }`}
     >
       <canvas ref={canvasRef} width={800} height={600} className="w-full h-full object-contain" />
 
@@ -1014,49 +1050,54 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
         </div>
       )}
 
-          {/* Vänsterstyrning: Pilar (Exakt storlek från Bild 2) */}
-          <div className="absolute bottom-6 left-4 flex gap-1 pointer-events-auto">
-            <button 
-                onPointerDown={(e)=>{ e.preventDefault(); touch.current.left=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.left=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.left=false; }}
-                style={{width:'72px',height:'72px'}}
-                className="bg-black/30 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-2xl border border-white/10 select-none active:bg-white/20 text-white"
-            >←</button>
-            <button 
-                onPointerDown={(e)=>{ e.preventDefault(); touch.current.right=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.right=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.right=false; }}
-                style={{width:'72px',height:'72px'}}
-                className="bg-black/30 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-2xl border border-white/10 select-none active:bg-white/20 text-white"
-            >→</button>
-          </div>
-          
-          {/* Högerstyrning: SKJUT+SPIN och HOPP längst till höger (Exakt storlek från Bild 2) */}
-          <div className="absolute bottom-6 right-4 flex items-end gap-3 pointer-events-auto">
-            <div className="flex flex-col items-center gap-3">
-                {/* SPIN (🌪️) - Ovanför SKJUT */}
+           {/* Touch-kontroller visas bara på mobil/touch-enhet (v1.82) */}
+          {gameStarted && isMobile && (
+            <>
+              {/* Vänsterstyrning: Pilar */}
+              <div className="absolute bottom-6 left-4 flex gap-1 pointer-events-auto">
                 <button 
-                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }}
-                    style={{width:'56px',height:'56px'}}
-                    className={`rounded-full border-2 font-black transition-all select-none text-[8px] tracking-widest flex items-center justify-center ${
-                    spinEnergy >= 100 
-                        ? 'bg-yellow-400 text-black border-yellow-200 shadow-[0_0_20px_rgba(250,204,21,0.6)] animate-pulse' 
-                        : 'bg-black/40 text-white/30 border-white/10'
-                    }`}
-                >SPIN</button>
-
-                {/* SKJUT (🔥) - Vänster om HOPP */}
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.left=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.left=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.left=false; }}
+                    style={{width:'72px',height:'72px'}}
+                    className="bg-black/30 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-2xl border border-white/10 select-none active:bg-white/20 text-white"
+                >←</button>
                 <button 
-                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.fire=true; }}
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.right=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.right=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.right=false; }}
+                    style={{width:'72px',height:'72px'}}
+                    className="bg-black/30 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-2xl border border-white/10 select-none active:bg-white/20 text-white"
+                >→</button>
+              </div>
+              
+              {/* Högerstyrning: SKJUT+SPIN och HOPP längst till höger */}
+              <div className="absolute bottom-6 right-4 flex items-end gap-3 pointer-events-auto">
+                <div className="flex flex-col items-center gap-3">
+                    {/* SPIN (🌪️) - Ovanför SKJUT */}
+                    <button 
+                        onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }}
+                        style={{width:'56px',height:'56px'}}
+                        className={`rounded-full border-2 font-black transition-all select-none text-[8px] tracking-widest flex items-center justify-center ${
+                        spinEnergy >= 100 
+                            ? 'bg-yellow-400 text-black border-yellow-200 shadow-[0_0_20px_rgba(250,204,21,0.6)] animate-pulse' 
+                            : 'bg-black/40 text-white/30 border-white/10'
+                        }`}
+                    >SPIN</button>
+    
+                    {/* SKJUT (🔥) - Vänster om HOPP */}
+                    <button 
+                        onPointerDown={(e)=>{ e.preventDefault(); touch.current.fire=true; }}
+                        style={{width:'85px',height:'85px'}}
+                        className="bg-red-700/80 backdrop-blur-md rounded-full font-black text-4xl shadow-2xl border-2 border-red-400/50 active:scale-95 transition-transform text-white flex items-center justify-center"
+                    >🔥</button>
+                </div>
+    
+                {/* HOPP (Blå) - Längst till höger */}
+                <button 
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
                     style={{width:'85px',height:'85px'}}
-                    className="bg-red-700/80 backdrop-blur-md rounded-full font-black text-4xl shadow-2xl border-2 border-red-400/50 active:scale-95 transition-transform text-white flex items-center justify-center"
-                >🔥</button>
-            </div>
-
-            {/* HOPP (Blå) - Längst till höger */}
-            <button 
-                onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
-                style={{width:'85px',height:'85px'}}
-                className="bg-blue-600/80 backdrop-blur-md rounded-full font-black text-[12px] shadow-2xl border-2 border-blue-400/50 active:scale-95 transition-transform text-white flex items-center justify-center uppercase tracking-widest"
-            >HOPP</button>
-          </div>
+                    className="bg-blue-600/80 backdrop-blur-md rounded-full font-black text-[12px] shadow-2xl border-2 border-blue-400/50 active:scale-95 transition-transform text-white flex items-center justify-center uppercase tracking-widest"
+                >HOPP</button>
+              </div>
+            </>
+          )}
     </div>
   );
 }
