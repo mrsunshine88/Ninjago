@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { Ninja, Level } from "@/lib/game-data";
 import { GameEngine } from "./GameEngine";
@@ -14,6 +14,7 @@ interface BattleViewProps {
   initialScore: number;
   retryCount?: number;
   isMuted: boolean;
+  isFreshStart: boolean;
   onToggleMute: () => void;
   onNext: (pointsGained: number) => void;
   onGameOver?: (score: number) => void;
@@ -27,26 +28,18 @@ export function BattleView({
   initialScore, 
   retryCount = 0, 
   isMuted,
+  isFreshStart,
   onToggleMute,
   onNext, 
   onGameOver, 
   onAbort 
 }: BattleViewProps) {
-  // v1.77: Återställer automatisk skärmlåsning (Portrait)
+  const [liveScore, setLiveScore] = useState(initialScore);
+
+  // [v2.14] Orientation & Scroll Lock (Handled centrally in page.tsx)
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.screen?.orientation) {
-      try {
-        // Notera: screen.orientation.lock kan kräva Fullscreen-läge först,
-        // men vi försöker ändå som vi gjorde i v1.74 då användaren vill ha tillbaka det.
-        (window.screen.orientation as any).lock?.('portrait').catch(() => {
-          console.log("[v1.77] Orientation lock requires user interaction or isn't supported.");
-        });
-      } catch (e) {
-        console.warn("[v1.77] Orientation error:", e);
-      }
-    }
-    
-    // Förhindra skroll på mobilen
+    // Vi litar på page.tsx för att hantera låsning/upplåsning
+    // men vi behåller prevent-scroll lokalt som en sista utväg
     document.body.style.overflow = 'hidden';
     document.body.style.position = 'fixed';
     document.body.style.width = '100%';
@@ -66,10 +59,23 @@ export function BattleView({
           <span className="text-3xl md:text-4xl font-black text-[#ff2e63] italic leading-none">{level?.number || 1} / 6</span>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
+            {/* [v2.14] Live HUD Score */}
+            <div className="flex flex-col items-end mr-2">
+                <span className="text-[9px] text-accent font-black uppercase tracking-[0.2em] leading-none mb-1">Poäng</span>
+                <span className="text-2xl md:text-3xl font-black text-white italic leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                    {(liveScore || 0).toLocaleString()}
+                </span>
+            </div>
+
             <Button 
                 variant="outline" 
-                onClick={(e) => { e.stopPropagation(); onToggleMute(); }} 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  if (typeof onToggleMute === 'function') {
+                    onToggleMute(); 
+                  }
+                }} 
                 className={`h-12 w-12 rounded-xl border-2 ${isMuted ? "bg-red-500/20 border-red-500/50" : "bg-white/10 border-white/20"}`}
             >
                 {isMuted ? <VolumeX className="w-6 h-6 text-red-500" /> : <Volume2 className="w-6 h-6 text-green-500" />}
@@ -101,10 +107,12 @@ export function BattleView({
           ninja={ninja}
           level={level}
           playerName={playerName}
-          initialScore={initialScore}
+          initialScore={isFreshStart ? 0 : initialScore}
           isMuted={isMuted}
+          isFreshStart={isFreshStart}
           onLevelComplete={(points) => onNext(points)}
           onGameOver={(finalScore) => onGameOver?.(finalScore)}
+          onScoreUpdate={(s) => setLiveScore(s)}
         />
       </div>
 

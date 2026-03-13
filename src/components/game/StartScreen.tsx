@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Flame, Snowflake, Mountain, Zap, Star, Waves, Swords, Volume2, VolumeX } from "lucide-react";
 import { Leaderboard } from "./Leaderboard";
 import { ScoreEntry, getLeaderboard, resetGlobalLeaderboard } from "@/lib/leaderboard";
+import { Howl } from 'howler';
 
 const ICONS: Record<string, any> = {
   Flame, Snowflake, Mountain, Zap, Star, Waves
@@ -29,7 +30,6 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
 
   useEffect(() => {
     const refreshScores = async () => {
-      console.log("[v1.89] Refreshing leaderboard...");
       const latest = await getLeaderboard();
       if (latest && latest.length > 0) {
         setLocalScores(latest);
@@ -58,13 +58,10 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
 
   const handleAdminReset = async () => {
     if (name === "020406") {
-      const ok = confirm("VILL DU VERKLIGEN NOLLSTÄLLA ALLA POÄNG I MOLNET? ⚠️");
-      if (ok) {
-        await resetGlobalLeaderboard();
-        setLocalScores([]);
-        alert("Topplistan har nollställts i molnet! 🥷✅");
-        window.location.reload();
-      }
+      // Silent Admin Reset
+      await resetGlobalLeaderboard();
+      setLocalScores([]);
+      window.location.reload();
     } else {
       setIsAdminMode(false);
       setName("");
@@ -73,65 +70,92 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
 
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
-  const menuMusicRef = useRef<HTMLAudioElement | null>(null);
+  const menuMusicRef = useRef<Howl | null>(null);
 
   useEffect(() => {
+    // PWA Install Logic: Capture from global window
+    const checkPrompt = () => {
+      if ((window as any).deferredPrompt) {
+        setInstallPrompt((window as any).deferredPrompt);
+        setTimeout(() => setShowInstallBanner(true), 2000);
+      }
+    };
+
+    checkPrompt();
+    window.addEventListener("pwa-prompt-available", checkPrompt);
+    
     const handler = (e: any) => {
       e.preventDefault();
+      (window as any).deferredPrompt = e;
       setInstallPrompt(e);
-      // Visa bannern automatiskt efter 2 sekunder på mobil
-      setTimeout(() => setShowInstallBanner(true), 2000);
+      setTimeout(() => setShowInstallBanner(true), 1000);
     };
     window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("pwa-prompt-available", checkPrompt);
+    };
   }, []);
 
   useEffect(() => {
-    // Skapa musikobjektet endast en gång
+    // Nuclear Audio: Using Howl definitively
     if (!menuMusicRef.current) {
-        menuMusicRef.current = new Audio('/audio/lucadialessandro-arcade-melody-295434.mp3');
-        menuMusicRef.current.loop = true;
+        menuMusicRef.current = new Howl({
+            src: ['/audio/lucadialessandro-arcade-melody-295434.mp3'],
+            loop: true,
+            volume: 0.4,
+            autoplay: true,
+            onplay: () => {
+              if (Howler.ctx && Howler.ctx.state !== 'running') Howler.ctx.resume();
+            }
+        });
     }
-    
-    // Uppdatera volym baserat på isMuted direkt
-    menuMusicRef.current.volume = isMuted ? 0 : 0.4;
-    
-    // Försök spela
-    const playAttempt = menuMusicRef.current.play();
-    if (playAttempt !== undefined) {
-      playAttempt.catch(() => {
-        // Ignorera autoplay-fel
-      });
-    }
+
+    // Force resume on mount too
+    if (Howler.ctx && Howler.ctx.state !== 'running') Howler.ctx.resume();
     
     return () => {
-      // Vi behåller ref men pausar om komponenten avmonteras helt
+      // Vi behåller ref
     };
-  }, [isMuted]);
+  }, []);
 
   // Stäng av musiken helt när vi lämnar startskärmen
   useEffect(() => {
     return () => {
         if (menuMusicRef.current) {
-            menuMusicRef.current.pause();
-            menuMusicRef.current.src = "";
+            menuMusicRef.current.stop();
             menuMusicRef.current = null;
         }
     };
   }, []);
 
+  // [v2.35] Sync Music with Mute state
+  useEffect(() => {
+    if (!isMuted && menuMusicRef.current && !menuMusicRef.current.playing()) {
+      menuMusicRef.current.play();
+      console.log("[v2.35] Music forced to play: menuMusic");
+    }
+  }, [isMuted]);
+
   const handleInstall = async () => {
     if (!installPrompt) return;
+    
+    // [v2.30] Wake up Audio
+    if (Howler.ctx && Howler.ctx.state !== 'running') Howler.ctx.resume();
+
     installPrompt.prompt();
     const { outcome } = await installPrompt.userChoice;
-    if (outcome === "accepted") { setInstallPrompt(null); setShowInstallBanner(false); }
+    if (outcome === "accepted") { 
+      setInstallPrompt(null); 
+      setShowInstallBanner(false); 
+    }
     setShowInstallBanner(false);
   };
 
   return (
     <div className="relative min-h-screen w-full flex flex-col items-center justify-center p-6 gap-8 overflow-hidden cursor-default">
-      {/* PWA Install Banner - stor och tydlig, syns på mobil */}
-      {showInstallBanner && installPrompt && (
+      {/* PWA Install Banner - [v2.30] Göm på desktop (width < 768) */}
+      {showInstallBanner && installPrompt && typeof window !== 'undefined' && window.innerWidth < 768 && (
         <div className="fixed inset-0 z-[9999] flex items-end justify-center pointer-events-none">
           <div className="pointer-events-auto w-full max-w-lg mx-4 mb-6 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-3xl shadow-[0_0_60px_rgba(251,191,36,0.5)] border-4 border-white p-6 animate-in slide-in-from-bottom duration-500">
             <div className="flex items-center gap-4">
@@ -155,8 +179,8 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
         </div>
       )}
 
-      {/* Liten install-knapp om bannern stängts */}
-      {installPrompt && !showInstallBanner && (
+      {/* [v2.30] Liten install-knapp - Göm också på desktop */}
+      {installPrompt && !showInstallBanner && typeof window !== 'undefined' && window.innerWidth < 768 && (
         <button 
           onClick={() => setShowInstallBanner(true)}
           className="absolute top-6 left-6 px-4 py-2 bg-yellow-400 text-black font-black rounded-full shadow-2xl z-50 flex items-center gap-2 border-2 border-black text-sm"
@@ -169,14 +193,9 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
       <button 
         onClick={(e) => { 
           e.stopPropagation(); 
-          const newVal = !isMuted;
-          onToggleMute(); 
-          
-          // [v1.87] Master Mute Sync (Mobile safe)
-          if (typeof window !== 'undefined' && (window as any).Howler) {
-            (window as any).Howler.mute(newVal);
+          if (typeof onToggleMute === 'function') {
+            onToggleMute(); 
           }
-          console.log("[v1.87] Master Mute set to:", newVal);
         }}
         onPointerDown={(e) => { e.stopPropagation(); }}
         className={`absolute top-6 right-6 p-4 backdrop-blur-xl border rounded-2xl shadow-2xl z-50 transition-all active:scale-95 group ${
@@ -281,10 +300,21 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
               <Button 
                 disabled={!canStart}
                 onClick={() => {
-                  // Trigga helskärm och lås skärm på mobil
+                  // [v2.30] Wake up Audio
+                  if (Howler.ctx && Howler.ctx.state !== 'running') Howler.ctx.resume();
+
+                  const recordElem = document.documentElement;
+                  if (recordElem.requestFullscreen) {
+                    recordElem.requestFullscreen().catch(err => {
+                      // Silently fail fullscreen
+                    });
+                  }
+
+                  if (typeof window !== 'undefined') {
+                    localStorage.clear();
+                  }
+                  
                   if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                    document.documentElement.requestFullscreen().catch(() => {});
-                    // Lås skärmen mot skroll
                     document.body.style.overflow = 'hidden';
                     document.body.style.touchAction = 'none';
                     document.body.style.overscrollBehavior = 'none';
@@ -304,9 +334,9 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute }: StartScr
         </div>
       </div>
 
-      {/* Version Tag - v1.39, nedre vänster */}
+      {/* Version Tag - v2.23, nedre vänster */}
       <div className="absolute bottom-4 left-4 text-white/50 text-[12px] font-black uppercase tracking-[0.2em] z-50 pointer-events-none select-none italic flex items-center gap-2">
-        v1.89 <span className={`w-1.5 h-1.5 rounded-full bg-green-500`} title="Stealth Key Active" />
+        v2.23 <span className={`w-1.5 h-1.5 rounded-full bg-green-500`} title="Stealth Key Active" />
       </div>
       {/* Credit Text - alltid centrerat längst ned, krockar ej med version */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[#FFD700] text-[11px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] z-50 pointer-events-none select-none whitespace-nowrap">

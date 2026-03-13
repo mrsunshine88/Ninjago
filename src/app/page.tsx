@@ -7,6 +7,7 @@ import { getLeaderboard, saveScore, ScoreEntry } from "@/lib/leaderboard";
 import { StartScreen } from "@/components/game/StartScreen";
 import { BattleView } from "@/components/game/BattleView";
 import { GameOverView } from "@/components/game/GameOverView";
+import { Howler } from 'howler';
 
 type GameState = 'menu' | 'playing' | 'gameover';
 
@@ -20,6 +21,7 @@ export default function NinjagoGame() {
   const [gameOverData, setGameOverData] = useState<{ score: number, isHighScore: boolean, isWin: boolean } | null>(null);
   const [leaderboard, setLeaderboard] = useState<ScoreEntry[]>([]);
   const [isMuted, setIsMuted] = useState(false);
+  const [isFreshStart, setIsFreshStart] = useState(false);
 
   // Load leaderboard and settings on mount
   useEffect(() => {
@@ -28,77 +30,101 @@ export default function NinjagoGame() {
         setLeaderboard(scores);
     };
     loadData();
-    const savedMute = localStorage.getItem('ninjago_muted') === 'true';
-    setIsMuted(savedMute);
   }, []);
 
   const toggleMute = useCallback(() => {
-    setIsMuted(prev => {
-      const newVal = !prev;
-      localStorage.setItem('ninjago_muted', String(newVal));
-      return newVal;
-    });
-  }, []);
+    const newMutedState = !isMuted;
+    setIsMuted(newMutedState);
 
-  // [v1.82] MASTER AUDIO SYNC
-  useEffect(() => {
-    console.log("[v1.89] Master Audio Sync. Muted:", isMuted);
-    
-    // Backup: Muta alla HTML5 Audio-element direkt
-    if (typeof document !== 'undefined') {
-      const allAudio = document.querySelectorAll('audio');
-      allAudio.forEach(audio => {
-        audio.muted = isMuted;
-      });
-    }
+    // [v2.35] GLOBAL MUTE SYNC & MUSIC RECOVERY
+    if (typeof window !== 'undefined') {
+      // Force resume on interaction
+      if (Howler.ctx && Howler.ctx.state !== 'running') {
+        Howler.ctx.resume().then(() => {
+          console.log(`[v2.35] AUDIO ENGINE UNLOCKED! (State: ${Howler.ctx.state})`);
+        });
+      }
 
-    // [v1.87] Master Mute Sync (Mobile safe)
-    if (typeof window !== 'undefined' && (window as any).Howler) {
-      (window as any).Howler.mute(isMuted);
+      // [v2.35] Use global mute instead of stopping (keeps music "playing" but silent)
+      Howler.mute(newMutedState);
+      
+      // If unmuting, ensure the music context is actually running
+      if (!newMutedState) {
+        console.log("[v2.35] Unmuting: Global Howler.mute(false) triggered.");
+      }
+
+      localStorage.setItem('ninjago_muted', JSON.stringify(newMutedState));
     }
   }, [isMuted]);
 
-  // [v1.87] SCROLL UNLOCK LOGIC
+  // Sync state on mount
   useEffect(() => {
-    if (gameState === 'menu') {
-      // Tvinga fram fri skrollning när vi är i menyn
-      if (typeof document !== 'undefined') {
-        document.body.style.overflow = 'auto';
-        document.body.style.position = 'static';
-        document.body.style.height = 'auto';
-        document.body.style.touchAction = 'auto';
-        document.body.style.overscrollBehavior = 'auto';
+    const savedMute = localStorage.getItem('ninjago_muted') === 'true';
+    setIsMuted(savedMute);
+    if (typeof window !== 'undefined') {
+        Howler.mute(savedMute);
         
-        // Avsluta fullskärm om den hänger kvar
-        if (document.fullscreenElement) {
-          document.exitFullscreen().catch(() => {});
+        // [v2.33] GLOBAL UNLOCK: Force AudioContext on ANY click
+        const unlock = () => {
+          if (Howler.ctx && Howler.ctx.state !== 'running') {
+            Howler.ctx.resume().then(() => {
+              console.log('[v2.33] AUDIO ENGINE UNLOCKED!');
+            });
+          }
+        };
+        window.addEventListener('click', unlock);
+        return () => window.removeEventListener('click', unlock);
+    }
+  }, []);
+
+  // SCROLL UNLOCK LOGIC (Aggressive & Centralized)
+  useEffect(() => {
+    if (gameState === 'menu' || gameState === 'gameover') {
+      const unlock = () => {
+        if (typeof document !== 'undefined') {
+          // Kraftfull återställning av både body och html
+          const targets = [document.body, document.documentElement];
+          targets.forEach(t => {
+            t.style.overflow = 'auto';
+            t.style.overflowX = 'hidden';
+            t.style.position = 'static';
+            t.style.height = 'auto';
+            t.style.touchAction = 'auto';
+            t.style.overscrollBehavior = 'auto';
+          });
+          
+          if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+          }
         }
-      }
+      };
+      
+      unlock();
+      // Kör en gång till efter en liten delay för att garantera att inga sena renders låser igen
+      const t = setTimeout(unlock, 100);
+      return () => clearTimeout(t);
     }
   }, [gameState]);
 
 
   const finishGame = useCallback(async (total: number, isWin: boolean = false) => {
-    setGameOverData(null); // Clear old data first
-    console.log(`[v1.89] Finishing game with score: ${total}. Awaiting save...`);
-    
-    // 1. Spara först (vänta på nätverket)
-    const result = await saveScore({
-      name: playerName,
-      score: total,
-      ninja: selectedNinja?.name || "Okänd",
-      date: new Date().toISOString()
-    });
-    
-    // 2. Sätt data och växla vy först när sparandet är bekräftat
-    setGameOverData({ score: total, isHighScore: result.isHighScore, isWin });
+    // Moving saveScore to GameOverView for "Stony Connected" logic
+    if (typeof window !== 'undefined') localStorage.setItem('ninjago_last_score', String(total));
+    setLastFinalScore(total);
+    setGameOverData({ score: total, isHighScore: false, isWin }); // isHighScore now handled by GameOverView
     const freshLeaderboard = await getLeaderboard();
     setLeaderboard(freshLeaderboard);
     setGameState('gameover');
-    console.log(`[v1.89] Save confirmed & Leaderboard refreshed.`);
-  }, [playerName, selectedNinja]);
+  }, [playerName]);
 
   const handleStart = useCallback((name: string, ninja: Ninja) => {
+    // Absolute Reset Lock
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ninjago_fresh_start', 'true');
+      localStorage.setItem('ninjago_last_score', '0');
+      localStorage.setItem('ninjago_emergency_score', '0');
+    }
+    setIsFreshStart(true);
     setPlayerName(name);
     setSelectedNinja(ninja);
     setScore(0);
@@ -108,10 +134,7 @@ export default function NinjagoGame() {
   }, []);
 
   const handleLevelComplete = useCallback((pointsGained: number) => {
-    // GameEngine returnerar nu det totala värdet (initialScore + levelPoints)
-    // Så vi sätter bara poängen direkt.
     setScore(pointsGained);
-    
     if (currentLevelIdx < LEVELS.length - 1) {
       setCurrentLevelIdx(idx => idx + 1);
     } else {
@@ -119,18 +142,24 @@ export default function NinjagoGame() {
     }
   }, [currentLevelIdx, finishGame]);
 
+  // Garanterad poängvisning: "Hinken" som sparar poängen precis innan unmount
+  const [lastFinalScore, setLastFinalScore] = useState(0);
+
   const handleGameOver = useCallback(async (totalScore: number) => {
-    // v1.89 Expert Sync: Ensure we have the absolute max score
-    const currentStored = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
-    const finalS = Math.max(score, totalScore, currentStored);
-    
-    console.log(`[v1.89] handleGameOver triggered. Score: ${finalS}. Awaiting finishGame...`);
-    setScore(finalS); // Update local state for display
-    await finishGame(finalS); // This function now awaits the network call
-  }, [score, finishGame]);
+    if (typeof window !== 'undefined') localStorage.setItem('ninjago_last_score', String(totalScore));
+    setLastFinalScore(totalScore);
+    setScore(totalScore); 
+    await finishGame(totalScore);
+  }, [finishGame]);
 
   const handleRetry = useCallback(() => {
-    // Spara poängen innan retry (om spelet kördes)
+    // Absolute Reset Lock
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ninjago_fresh_start', 'true');
+      localStorage.setItem('ninjago_last_score', '0');
+      localStorage.setItem('ninjago_emergency_score', '0');
+    }
+    setIsFreshStart(true);
     setScore(0);
     setGameOverData(null);
     setCurrentLevelIdx(0);
@@ -181,6 +210,7 @@ export default function NinjagoGame() {
           initialScore={score}
           retryCount={retryCount}
           isMuted={isMuted}
+          isFreshStart={isFreshStart}
           onToggleMute={toggleMute}
           onNext={handleLevelComplete}
           onGameOver={handleGameOver}
@@ -191,10 +221,9 @@ export default function NinjagoGame() {
       {gameState === 'gameover' && gameOverData && (
         <GameOverView 
           playerName={playerName} 
-          finalScore={gameOverData.score} 
-          isHighScore={gameOverData.isHighScore} 
+          finalScore={lastFinalScore} 
           isGameWon={gameOverData.isWin}
-          leaderboard={leaderboard}
+          ninjaName={selectedNinja?.name || "Okänd"}
           isMuted={isMuted}
           onReset={handleReset}
           onRetry={handleRetry} 

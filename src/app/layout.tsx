@@ -32,6 +32,15 @@ export default function RootLayout({
         <meta name="theme-color" content="#EF4444" />
         <meta name="mobile-web-app-capable" content="yes" />
         <script dangerouslySetInnerHTML={{ __html: `
+          window.deferredPrompt = null;
+          window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            window.deferredPrompt = e;
+            console.log('[v2.28] beforeinstallprompt captured');
+            // Dispatch custom event to notify StartScreen
+            window.dispatchEvent(new Event('pwa-prompt-available'));
+          });
+
           if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
               navigator.serviceWorker.register('/sw.js');

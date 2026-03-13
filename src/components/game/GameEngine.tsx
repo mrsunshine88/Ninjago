@@ -1,8 +1,7 @@
-"use client";
-
 import React, { useRef, useEffect, useState } from 'react';
 import { Ninja, Level } from '@/lib/game-data';
 import { getLeaderboard } from '@/lib/leaderboard';
+import { Howl } from 'howler';
 
 interface Particle {
     x: number; y: number; dx: number; dy: number; 
@@ -16,19 +15,33 @@ interface GameEngineProps {
   playerName: string;
   initialScore: number;
   isMuted: boolean;
+  isFreshStart: boolean;
   onGameOver: (score: number) => void;
   onLevelComplete: (points: number) => void;
+  onScoreUpdate?: (score: number) => void;
 }
 
-export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted, onGameOver, onLevelComplete }: GameEngineProps) {
+export function GameEngine({ 
+  ninja, 
+  level, 
+  playerName, 
+  initialScore = 0, 
+  isMuted, 
+  isFreshStart = false,
+  onGameOver, 
+  onLevelComplete,
+  onScoreUpdate 
+}: GameEngineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<Howl | null>(null);
+  const currentMusicSrc = useRef<string>("");
   const [isMobile, setIsMobile] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
   const [showLevelIntro, setShowLevelIntro] = useState(false);
   const cleanedImages = useRef<Record<string, HTMLCanvasElement>>({});
-  const [currentScore, setCurrentScore] = useState(Number(initialScore) || 0);
+  // Hard-Force 0 at start
+  const [currentScore, setCurrentScore] = useState(0);
   const [spinEnergy, setSpinEnergy] = useState(0);
   const [displayTime, setDisplayTime] = useState(0);
 
@@ -42,9 +55,15 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
     onLevelCompleteRef.current = onLevelComplete;
     isMutedRef.current = isMuted;
 
-    // Uppdatera volym på bakgrundsmusik direkt
+    // [v2.35] Global Mute definitively handled by Howler.mute()
     if (audioRef.current) {
-        audioRef.current.volume = isMuted ? 0 : 0.4;
+        audioRef.current.volume(0.4);
+        
+        // [v2.35] Force play if unmuted and not playing
+        if (!isMuted && !audioRef.current.playing()) {
+          audioRef.current.play();
+          console.log("[v2.35] Music forced to play: battleMusic");
+        }
     }
   }, [onGameOver, onLevelComplete, isMuted]);
   const [lives, setLives] = useState(3);
@@ -55,10 +74,10 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
   const state = useRef({
     started: false,
     active: true,
-    score: Number(initialScore) || 0,
-    maxScore: Number(initialScore) || 0, // High-water mark for v1.55
+    score: 0, // PERMANENT 0
+    maxScore: 0, 
     energy: 0,
-    lastReportedScore: Number(initialScore) || 0, // Extra sync-fält
+    lastReportedScore: 0, 
     cameraX: 0,
     timeLeft: 0,
     highScore: 0,
@@ -95,11 +114,21 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
     'lila svart monster.png', 'lila svart stor orm.png', 'stor drake.png', 'storm arg orm.png'
   ];
 
+  // Robust Enhetsdetektering (Separat för renhet)
+  useEffect(() => {
+    const checkDevice = () => {
+      const isTouch = (typeof window !== 'undefined') && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+      const isNarrow = (typeof window !== 'undefined') && (window.innerWidth < 1024);
+      setIsMobile(isTouch && isNarrow);
+    };
+    checkDevice();
+    window.addEventListener('resize', checkDevice);
+    return () => window.removeEventListener('resize', checkDevice);
+  }, []);
+
   const playSFX = (file: string, vol = 0.4) => {
-    if (isMutedRef.current) return;
-    const audio = new Audio(`/audio/${file}`);
-    audio.volume = vol;
-    audio.play().catch(() => {});
+    // Global Mute via Howl.mute() handle internally
+    new Howl({ src: [`/audio/${file}`], volume: vol, autoplay: true });
   };
 
   useEffect(() => {
@@ -127,27 +156,11 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
             setHighScore(lb[0].score);
             state.current.highScore = lb[0].score;
         }
-        // Emergency Recovery: Om poängen är 0 på Nivå 1 men vi har något i minnet...
-        if (typeof window !== 'undefined' && state.current.score === 0) {
-            const saved = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
-            if (saved > 0) {
-                console.log(`[v1.89] Recovered score from storage: ${saved}`);
-                state.current.score = saved;
-                state.current.lastReportedScore = saved;
-                setCurrentScore(saved);
-            }
-        }
+        // Score Recovery logic REMOVED permanently.
+        // Game will always start at 0.
     };
     loadLB();
 
-    // [v1.89] EXPERT DEVICE DETECTION
-    const checkDevice = () => {
-        const hasTouch = (typeof window !== 'undefined') && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-        const isSmall = (typeof window !== 'undefined') && (window.innerWidth < 1024);
-        setIsMobile(hasTouch && isSmall);
-    };
-    checkDevice();
-    window.addEventListener('resize', checkDevice);
 
     const heroFiles = ['kai.png', 'Jay.png', 'zane.png', 'Cole.png', 'Lloyd.png', 'Nya.png'];
     heroFiles.forEach(f => {
@@ -189,15 +202,14 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
         state.current.active = false; 
         window.removeEventListener('keydown', kd);
         window.removeEventListener('keyup', ku);
-        window.removeEventListener('resize', checkDevice);
-        if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+        if (audioRef.current) { audioRef.current.stop(); audioRef.current = null; }
         // Tvinga webbläsaren att tillåta skrollning igen vid avmontering
         if (typeof document !== 'undefined') {
             document.body.style.overflow = 'auto';
             document.body.style.position = 'static';
         }
     };
-  }, [level, ninja]);
+  }, [level, ninja, isFreshStart]);
 
   const handleStartGame = async () => {
     state.current.started = true;
@@ -349,10 +361,14 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
   useEffect(() => {
     if (!gameStarted || !state.current.active) return;
     if (!audioRef.current) {
-        // Starta med stridsmusik när banan börjar
-        const audio = new Audio('/audio/ninjago_battle_music_8bit.wav');
-        audio.loop = true; audio.volume = isMutedRef.current ? 0 : 0.4; audio.play().catch(() => {});
-        audioRef.current = audio;
+        // Nuclear Audio: Using Howl
+        currentMusicSrc.current = 'battle';
+        audioRef.current = new Howl({
+            src: ['/audio/ninjago_battle_music_8bit.wav'],
+            loop: true,
+            volume: 0.4,
+            autoplay: true
+        });
     }
 
     const canvas = canvasRef.current;
@@ -476,7 +492,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
             s.frames++;
             // Bulletproof Sync: Spara till localStorage varje sekund
             if (s.frames % 60 === 0 && s.score > 0) {
-                localStorage.setItem('ninjago_emergency_score', String(s.score));
+                // Mid-game save removed as requested
             }
             
             // Camera (Fixed v1.89: Bi-directional following)
@@ -484,8 +500,17 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
             s.cameraX = Math.min(Math.max(0, targetX), level.length - 800);
             s.energy = Math.min(100, s.energy + 0.2); 
             
-            // Per-frame mirroring for ultimate safety
-            if (s.score > 0) localStorage.setItem('ninjago_emergency_score', String(s.score));
+            // Removed per-frame mirroring
+
+            // Fall-Death check (Moved here for safety)
+            if (s.y > 600 && s.active) { 
+                s.active = false;
+                const finalS = Math.max(Number(s.score) || 0, Number(s.maxScore) || 0);
+                // Fall Death.
+                setCurrentScore(finalS);
+                if (typeof window !== 'undefined') localStorage.setItem('ninjago_last_score', String(finalS));
+                onGameOverRef.current(finalS); 
+            }
         }
         
         if ((state.current.fireReq || touch.current.fire) && !s.spin) { 
@@ -547,7 +572,6 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                 s.score += 50;
                 s.maxScore = Math.max(s.maxScore, s.score); // v1.89
                 s.lastReportedScore = s.maxScore;
-                if (typeof window !== 'undefined') localStorage.setItem('ninjago_emergency_score', String(s.maxScore));
                 setCurrentScore(s.score);
                 s.scorePopups.push({ x: coin.x, y: coin.y, text: "+50", life: 60 });
                 playSFX('sfx_lightning_8bit.wav', 0.2);
@@ -629,18 +653,6 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                         e.jumpMode = null; // Vi faller redan
                     }
                 } 
-                else if (playerIsBelow && currentPlat && enemyOnGround && isVisible) {
-                    // Spelaren är nedanför – hoppa NED mot spelaren
-                    e.jumpMode = dist < 0 ? 'left' : 'right';
-                    e.dx = e.jumpMode === 'left' ? -(baseSpeed + 3) : (baseSpeed + 3);
-                }
-        if (s.y > 600 && s.active) { 
-            s.active = false;
-            const finalS = Math.max(Number(s.score) || 0, Number(s.maxScore) || 0);
-            console.log(`[v1.89] Fall Death. Final Score: ${finalS}`);
-            setCurrentScore(finalS);
-            onGameOverRef.current(finalS); 
-        }
                 else {
                     // Spelaren är ovanför – patrullera istället, hoppa INTE
                     e.jumpMode = null;
@@ -712,11 +724,9 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                     s.combo = 0; // Reset combo vid skada
                     if (s.lives <= 0) {
                         s.active = false;
-                        let finalScoreBackup = 0;
-                        if (typeof window !== 'undefined') finalScoreBackup = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
                         const finalS = Math.max(Number(s.maxScore) || 0, s.lastReportedScore || 0, Number(localStorage.getItem('ninjago_emergency_score')) || 0);
-                        console.log(`[v1.89] Game Over (Enemy). Final: ${finalS}`);
                         setCurrentScore(finalS);
+                        if (typeof window !== 'undefined') localStorage.setItem('ninjago_last_score', String(finalS));
                         setTimeout(() => onGameOverRef.current(finalS), 1500);
                     } else {
                         // Respawn med invincibility
@@ -804,11 +814,9 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                     s.shake = 12; s.combo = 0;
                     if (s.lives <= 0) {
                         s.active = false;
-                        let finalScoreBackup = 0;
-                        if (typeof window !== 'undefined') finalScoreBackup = Number(localStorage.getItem('ninjago_emergency_score')) || 0;
-                        const finalS = Math.max(Number(s.maxScore) || 0, s.lastReportedScore || 0, finalScoreBackup);
-                        console.log(`[v1.89] Game Over (Proj). Final: ${finalS}`);
+                        const finalS = Math.max(Number(s.maxScore) || 0, s.lastReportedScore || 0);
                         setCurrentScore(finalS);
+                        if (typeof window !== 'undefined') localStorage.setItem('ninjago_last_score', String(finalS));
                         setTimeout(() => onGameOverRef.current(finalS), 1500);
                     } else {
                         s.invincible = 120;
@@ -877,14 +885,16 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
         
         if (s.x > level.length - 2800) {
             const b = s.boss;
-            // Byt till boss-musik när bossen dyker upp (respektera mute)
-            if (audioRef.current && audioRef.current.src.indexOf('boss') === -1) {
-                audioRef.current.pause();
-                const bossAudio = new Audio('/audio/imij-stairs-to-the-boss-fight-322652.mp3');
-                bossAudio.loop = true; 
-                bossAudio.volume = isMutedRef.current ? 0 : 0.5;
-                bossAudio.play().catch(() => {});
-                audioRef.current = bossAudio;
+            // Boss music transition via Howl
+            if (audioRef.current && currentMusicSrc.current !== 'boss') {
+                currentMusicSrc.current = 'boss';
+                audioRef.current.stop();
+                audioRef.current = new Howl({
+                    src: ['/audio/imij-stairs-to-the-boss-fight-322652.mp3'],
+                    loop: true,
+                    volume: 0.5,
+                    autoplay: true
+                });
             }
 
              // Kollision med bossen (bara om bossen är "aktiverad" / i närheten)
@@ -911,9 +921,9 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
                 } else if (s.active) { 
                     s.active = false;
                     playSFX('lolo_s-down-474082.mp3', 1.0); 
-                    const finalS = Math.max(Number(s.maxScore) || 0, s.lastReportedScore || 0, Number(localStorage.getItem('ninjago_emergency_score')) || 0);
-                    console.log(`[v1.82] Game Over (Boss Touch). Final: ${finalS}`);
+                    const finalS = Math.max(Number(s.maxScore) || 0, s.lastReportedScore || 0);
                     setCurrentScore(finalS);
+                    if (typeof window !== 'undefined') localStorage.setItem('ninjago_last_score', String(finalS));
                     setTimeout(() => onGameOverRef.current(finalS), 1500);
                 }
               }
@@ -963,6 +973,7 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
         if (frames % 3 === 0) { 
             const safeScore = Number(s.score) || 0;
             setCurrentScore(safeScore); 
+            onScoreUpdate?.(safeScore);
             setSpinEnergy(s.energy); 
             setDisplayTime(s.timeLeft); 
             setLives(s.lives); 
@@ -1019,10 +1030,8 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
 
       {gameStarted && (
         <div className="absolute top-4 inset-x-4 z-[200] flex justify-between items-start pointer-events-none">
-            {/* Poäng */}
-            <div className={`px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/10 text-white font-black shadow-xl flex items-center gap-2 ${isMobile ? 'text-lg' : 'text-3xl'}`}>
-                <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" /> {currentScore}
-            </div>
+            {/* Poäng: [v2.12] Flyttad till HUD-ram för bättre synlighet */}
+            <div className="w-1 px-4 py-1.5 opacity-0">.</div>
             
             {/* Spin-energi i mitten */}
             <div className="absolute left-1/2 -translate-x-1/2 top-2 flex flex-col items-center gap-0.5">
@@ -1050,54 +1059,49 @@ export function GameEngine({ ninja, level, playerName, initialScore = 0, isMuted
         </div>
       )}
 
-           {/* Touch-kontroller visas bara på mobil/touch-enhet (v1.82) */}
-          {gameStarted && isMobile && (
-            <>
-              {/* Vänsterstyrning: Pilar */}
-              <div className="absolute bottom-6 left-4 flex gap-1 pointer-events-auto">
+      {/* [v2.11] Touch-kontroller optimerade för STÅENDE LÄGE */}
+      {gameStarted && isMobile && (
+        <>
+          {/* Vänsterstyrning: Pilar - Lyfta för att synas ovanför footer */}
+          <div className="absolute bottom-24 left-4 flex gap-2 pointer-events-auto z-[3000]">
+            <button 
+                onPointerDown={(e)=>{ e.preventDefault(); touch.current.left=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.left=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.left=false; }}
+                className="w-16 h-16 bg-black/50 backdrop-blur-xl rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/40 text-white"
+            >←</button>
+            <button 
+                onPointerDown={(e)=>{ e.preventDefault(); touch.current.right=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.right=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.right=false; }}
+                className="w-16 h-16 bg-black/50 backdrop-blur-xl rounded-2xl flex items-center justify-center text-3xl shadow-2xl border-2 border-white/20 select-none active:bg-white/40 text-white"
+            >→</button>
+          </div>
+          
+          {/* Högerstyrning: SPECIELL LAYOUT (v2.11) - Lyfta (bottom-24) */}
+          <div className="absolute bottom-24 right-4 flex items-end gap-3 pointer-events-auto z-[3000]">
+            <div className="flex flex-col items-center gap-3">
+                {/* SPIN (🌪️) */}
                 <button 
-                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.left=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.left=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.left=false; }}
-                    style={{width:'72px',height:'72px'}}
-                    className="bg-black/30 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-2xl border border-white/10 select-none active:bg-white/20 text-white"
-                >←</button>
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }}
+                    className={`w-14 h-14 rounded-full border-2 font-black transition-all select-none text-[8px] tracking-widest flex items-center justify-center ${
+                    spinEnergy >= 100 
+                        ? 'bg-yellow-400 text-black border-yellow-200 shadow-[0_0_20px_#fbbf24] animate-pulse' 
+                        : 'bg-yellow-600/40 text-white/70 border-yellow-500/30'
+                    }`}
+                >SPIN</button>
+
+                {/* SKJUT (🔥) - Röd (Flyttad till vänster om hopp) */}
                 <button 
-                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.right=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.right=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.right=false; }}
-                    style={{width:'72px',height:'72px'}}
-                    className="bg-black/30 backdrop-blur-md rounded-2xl flex items-center justify-center text-4xl shadow-2xl border border-white/10 select-none active:bg-white/20 text-white"
-                >→</button>
-              </div>
-              
-              {/* Högerstyrning: SKJUT+SPIN och HOPP längst till höger */}
-              <div className="absolute bottom-6 right-4 flex items-end gap-3 pointer-events-auto">
-                <div className="flex flex-col items-center gap-3">
-                    {/* SPIN (🌪️) - Ovanför SKJUT */}
-                    <button 
-                        onPointerDown={(e)=>{ e.preventDefault(); touch.current.spin=true; }}
-                        style={{width:'56px',height:'56px'}}
-                        className={`rounded-full border-2 font-black transition-all select-none text-[8px] tracking-widest flex items-center justify-center ${
-                        spinEnergy >= 100 
-                            ? 'bg-yellow-400 text-black border-yellow-200 shadow-[0_0_20px_rgba(250,204,21,0.6)] animate-pulse' 
-                            : 'bg-black/40 text-white/30 border-white/10'
-                        }`}
-                    >SPIN</button>
-    
-                    {/* SKJUT (🔥) - Vänster om HOPP */}
-                    <button 
-                        onPointerDown={(e)=>{ e.preventDefault(); touch.current.fire=true; }}
-                        style={{width:'85px',height:'85px'}}
-                        className="bg-red-700/80 backdrop-blur-md rounded-full font-black text-4xl shadow-2xl border-2 border-red-400/50 active:scale-95 transition-transform text-white flex items-center justify-center"
-                    >🔥</button>
-                </div>
-    
-                {/* HOPP (Blå) - Längst till höger */}
-                <button 
-                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
-                    style={{width:'85px',height:'85px'}}
-                    className="bg-blue-600/80 backdrop-blur-md rounded-full font-black text-[12px] shadow-2xl border-2 border-blue-400/50 active:scale-95 transition-transform text-white flex items-center justify-center uppercase tracking-widest"
-                >HOPP</button>
-              </div>
-            </>
-          )}
+                    onPointerDown={(e)=>{ e.preventDefault(); touch.current.fire=true; }}
+                    className="w-20 h-20 bg-red-600/90 backdrop-blur-xl rounded-full font-black text-3xl shadow-2xl border-4 border-red-400/50 active:scale-90 transition-transform text-white flex items-center justify-center"
+                >🔥</button>
+            </div>
+
+            {/* HOPP (Blå) - Längst till höger */}
+            <button 
+                onPointerDown={(e)=>{ e.preventDefault(); touch.current.jump=true; }} onPointerUp={(e)=>{ e.preventDefault(); touch.current.jump=false; }} onPointerLeave={(e)=>{ e.preventDefault(); touch.current.jump=false; }}
+                className="w-20 h-20 bg-blue-600/90 backdrop-blur-xl rounded-full font-black text-[10px] shadow-2xl border-4 border-blue-400/50 active:scale-90 transition-transform text-white flex items-center justify-center uppercase tracking-widest"
+            >HOPP</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
