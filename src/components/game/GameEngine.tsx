@@ -830,9 +830,12 @@ export function GameEngine({
                             const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
                             const data = imageData.data;
                             for (let j = 0; j < data.length; j += 4) { 
-                                // [v3.60] Catch near-white and grayish pixels to remove outlines ("net" issue)
+                                // [v3.70] Aggressive transparency cleanup for Level 6 and others ("net" issue)
                                 const r = data[j], g = data[j + 1], bDigit = data[j + 2];
-                                if ((r > 210 && g > 210 && bDigit > 210) || (r > 240 || g > 240 || bDigit > 240)) data[j + 3] = 0; 
+                                // Catch near-white, light gray, and very bright colors
+                                // Level 6 often has artifacts in the 170-200 range
+                                const threshold = (level.number === 6) ? 160 : 190;
+                                if ((r > threshold && g > threshold && bDigit > threshold) || (r > 240 || g > 240 || bDigit > 240)) data[j + 3] = 0; 
                             }
                             tempCtx.putImageData(imageData, 0, 0); cleanedImages.current[e.img] = canvas;
                         }
@@ -1048,7 +1051,7 @@ export function GameEngine({
                 const b = s.boss;
                 if (!b.active) {
                     b.active = true;
-                    b.attackCd = 30; // [v3.60] Start shooting almost immediately
+                    b.attackCd = 20; // [v3.70] First shot even faster
                     // [v3.10] Rensa vägen: Ta bort alla småfiender när duellen börjar
                     s.enemies = [];
                 }
@@ -1073,30 +1076,19 @@ export function GameEngine({
                 }
             }
 
-            if (s.x > level.length - 1000) {
+            // [v3.70] Persistent Shooting Logic: Boss keeps shooting as long as it's active
+            if (s.boss.active && s.boss.hp > 0) {
                 const b = s.boss;
                 b.attackCd -= dt;
                 if (b.attackCd <= 0 && s.freezeTime <= 0) {
                     const bX = b.x + b.w / 2, bY = b.y + b.h / 2;
                     const angle = Math.atan2((s.y + 140) - bY, (s.x + 70) - bX);
 
-                    // [v3.26] ULTIMATE BALANCE: Reduced scaling 0.6 -> 0.35
-                    let speed = (6 + (level.number || 1) * 0.35) * 1.3;
-                    let color = '#ff4400';
-                    let type: any = 'fire';
-
-                    if (level.number === 2) { color = '#00ccff'; type = 'ice'; speed = 5 * 1.3; }
-                    else if (level.number === 3) { color = '#ffaa00'; speed = 9 * 1.3; }
-                    else if (level.number === 4) { color = '#eeff00'; type = 'lightning'; }
-                    else if (level.number === 5) { color = '#8800ff'; type = 'void'; }
-                    else if (level.number === 6) { color = '#ff0000'; type = 'void'; speed = 8 * 1.3; }
-
-                    // [v2.93] Balanced Attack Patterns
                     const lvlNum = level.number || 1;
                     const isHoming = lvlNum >= 4 && Math.random() < 0.3;
 
                     if (lvlNum === 7) {
-                        // [v3.60] Lord Garmadon: 2-shot fan
+                        // [v3.70] Lord Garmadon: 2-shot fan
                         for (let j = 0; j < 2; j++) {
                             const spreadAngle = angle + (j === 0 ? -0.15 : 0.15);
                             s.bossProjs.push({
@@ -1107,24 +1099,49 @@ export function GameEngine({
                                 isHoming, phase: 0, baseY: bY
                             });
                         }
+                        b.attackCd = 12;
                     } else {
-                        // [v3.60] Level 1-6 ALWAYS 1 shot, frequency scales to meet requirement
+                        // [v3.70] Level 1-6 shooting frequency
+                        const speed = (6 + lvlNum * 0.35) * 1.3;
+                        let color = '#ff4400';
+                        let type: any = 'fire';
+                        if (lvlNum === 2) { color = '#00ccff'; type = 'ice'; }
+                        else if (lvlNum === 3) color = '#ffaa00';
+                        else if (lvlNum === 4) { color = '#eeff00'; type = 'lightning'; }
+                        else if (lvlNum === 5) { color = '#8800ff'; type = 'void'; }
+                        else if (lvlNum === 6) { color = '#ff0000'; type = 'void'; }
+
                         s.bossProjs.push({
                             x: bX, y: bY,
                             dx: Math.cos(angle) * speed,
                             dy: Math.sin(angle) * speed,
                             c: color, r: 25 + lvlNum * 5, type, isHoming
                         });
+
+                        // [v3.70] Clear intervals: Lv1: 0.6s, Lv6: 0.25s
+                        // Calculation: 45 - (lvlNum * 5) -> 40, 35, 30, 25, 20, 15
+                        b.attackCd = Math.max(15, 45 - (lvlNum * 5));
+
+                        // [v3.70] Particles for Lv 1-6
+                        for (let k = 0; k < 10; k++) s.particles.push({ 
+                            x: bX, y: bY, dx: (Math.random() - 0.5) * 10, dy: (Math.random() - 0.5) * 10, 
+                            life: 20, size: 4, color: color, type: 'spark' 
+                        });
+                    }
+                    
+                    // [v3.70] Garmadon Particles (handled separately to avoid scope errors)
+                    if (lvlNum === 7) {
+                        for (let k = 0; k < 10; k++) s.particles.push({ 
+                            x: bX, y: bY, dx: (Math.random() - 0.5) * 10, dy: (Math.random() - 0.5) * 10, 
+                            life: 20, size: 4, color: '#8800ff', type: 'spark' 
+                        });
                     }
 
-                    // [v3.60] Optimized Difficulty scaling: Lv1 approx 0.75s between shots, Lv6 very fast
-                    s.boss.attackCd = lvlNum === 7 ? 12 : Math.max(15, 60 - (lvlNum * 8));
                     // [v2.42] Drenched Effect: Shoot 50% slower (Double Cd)
                     if (b.drenchedT > 0) {
-                        s.boss.attackCd *= 2;
+                        b.attackCd *= 2;
                         b.drenchedT--;
                     }
-                    for (let k = 0; k < 10; k++) s.particles.push({ x: bX, y: bY, dx: (Math.random() - 0.5) * 10, dy: (Math.random() - 0.5) * 10, life: 20, size: 4, color: color, type: 'spark' });
                 }
             }
 
@@ -1372,10 +1389,15 @@ export function GameEngine({
                             ctx.translate(-(b.x + b.w / 2), -(b.y + b.h / 2));
                         }
 
-                        // [v3.60] Universal Boss Flip: ALL bosses face left
-                        ctx.translate(b.x + b.w, b.y);
-                        ctx.scale(-1, 1);
-                        ctx.drawImage(cleanedBImg, 0, 0, b.w, b.h);
+                        // [v3.70] Selective Boss Flip: 1, 4, 5 No Flip; 2, 3, 6, 7 Flip
+                        const needsFlip = [2, 3, 6, 7].includes(level.number);
+                        if (needsFlip) {
+                            ctx.translate(b.x + b.w, b.y);
+                            ctx.scale(-1, 1);
+                            ctx.drawImage(cleanedBImg, 0, 0, b.w, b.h);
+                        } else {
+                            ctx.drawImage(cleanedBImg, b.x, b.y, b.w, b.h);
+                        }
                     } finally {
                         ctx.restore();
                     }
