@@ -70,7 +70,7 @@ export function BattleView({
           {/* Vänster: Nivå */}
           <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
             <span className="text-[10px] md:text-sm text-white/40 font-black uppercase tracking-widest mt-0.5">
-              {isLandscape ? "v4.0 | STABLE LS" : "v4.0 | FIXED UI"}
+              {isLandscape ? "v4.1 | STABLE LS" : "v4.1 | FIXED UI"}
             </span>
           </div>
 

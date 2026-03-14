@@ -121,7 +121,7 @@ export function GameEngine({
             images.current[key] = img;
         });
 
-        const bossFiles = ['overlord_v2.png', 'stor drake.png', 'lila svart stor orm.png', 'storm arg orm.png', 'grön demon.png', 'lila svart monster.png', 'Lord Garmadon.png'];
+        const bossFiles = ['overlord_v3.png', 'stor drake.png', 'lila svart stor orm.png', 'storm arg orm.png', 'grön demon.png', 'lila svart monster.png', 'Lord Garmadon.png'];
         [...monsterFiles, ...bossFiles].forEach(f => {
             const img = new Image();
             img.src = `/${encodeURIComponent(f)}`;
@@ -302,7 +302,7 @@ export function GameEngine({
             state.current.enemies = enemies;
 
             // [v3.47] Use standardized image key from game-data
-            const bossImg = level.boss.imageKey || 'overlord.png';
+            const bossImg = level.boss.imageKey || 'overlord_v3.png';
             // [v3.71] Boss HP: Reverted to original levels but with Active Defense
             let bossHP = 1000; // Level 1
             if (level.number === 2) bossHP = 2000;
