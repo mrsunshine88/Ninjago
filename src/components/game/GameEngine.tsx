@@ -830,7 +830,7 @@ export function GameEngine({
                             const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
                             const data = imageData.data;
                             for (let j = 0; j < data.length; j += 4) { 
-                                // [v3.56] Catch near-white and grayish pixels to remove outlines ("net" issue)
+                                // [v3.60] Catch near-white and grayish pixels to remove outlines ("net" issue)
                                 const r = data[j], g = data[j + 1], bDigit = data[j + 2];
                                 if ((r > 210 && g > 210 && bDigit > 210) || (r > 240 || g > 240 || bDigit > 240)) data[j + 3] = 0; 
                             }
@@ -856,7 +856,7 @@ export function GameEngine({
                         ctx.restore();
                     }
                 } else if (!isOnScreen) {
-                   // No draw - [v3.56] Ensure strict removal if far behind camera
+                   // No draw - [v3.60] Ensure strict removal if far behind camera
                    if (e.x < s.cameraX - 500) {
                        s.enemies.splice(i, 1);
                        continue;
@@ -1048,7 +1048,7 @@ export function GameEngine({
                 const b = s.boss;
                 if (!b.active) {
                     b.active = true;
-                    b.attackCd = 30; // [v3.56] Start shooting almost immediately
+                    b.attackCd = 30; // [v3.60] Start shooting almost immediately
                     // [v3.10] Rensa vägen: Ta bort alla småfiender när duellen börjar
                     s.enemies = [];
                 }
@@ -1096,7 +1096,7 @@ export function GameEngine({
                     const isHoming = lvlNum >= 4 && Math.random() < 0.3;
 
                     if (lvlNum === 7) {
-                        // [v3.56] Lord Garmadon: 2-shot fan
+                        // [v3.60] Lord Garmadon: 2-shot fan
                         for (let j = 0; j < 2; j++) {
                             const spreadAngle = angle + (j === 0 ? -0.15 : 0.15);
                             s.bossProjs.push({
@@ -1108,7 +1108,7 @@ export function GameEngine({
                             });
                         }
                     } else {
-                        // [v3.56] Level 1-6 ALWAYS 1 shot, frequency scales to meet requirement
+                        // [v3.60] Level 1-6 ALWAYS 1 shot, frequency scales to meet requirement
                         s.bossProjs.push({
                             x: bX, y: bY,
                             dx: Math.cos(angle) * speed,
@@ -1117,7 +1117,7 @@ export function GameEngine({
                         });
                     }
 
-                    // [v3.56] Optimized Difficulty scaling: Lv1 approx 0.75s between shots, Lv6 very fast
+                    // [v3.60] Optimized Difficulty scaling: Lv1 approx 0.75s between shots, Lv6 very fast
                     s.boss.attackCd = lvlNum === 7 ? 12 : Math.max(15, 60 - (lvlNum * 8));
                     // [v2.42] Drenched Effect: Shoot 50% slower (Double Cd)
                     if (b.drenchedT > 0) {
@@ -1372,7 +1372,7 @@ export function GameEngine({
                             ctx.translate(-(b.x + b.w / 2), -(b.y + b.h / 2));
                         }
 
-                        // [v3.56] Universal Boss Flip: ALL bosses face left
+                        // [v3.60] Universal Boss Flip: ALL bosses face left
                         ctx.translate(b.x + b.w, b.y);
                         ctx.scale(-1, 1);
                         ctx.drawImage(cleanedBImg, 0, 0, b.w, b.h);
@@ -1416,7 +1416,7 @@ export function GameEngine({
             }
             ctx.filter = 'none'; // [v3.45] Explicit reset
         } catch (err) {
-            console.error('[v3.55] Render Crash Recovered:', err);
+            console.error('[v3.60] Render Crash Recovered:', err);
         }
         raf = requestAnimationFrame(loop);
     };
@@ -1506,7 +1506,7 @@ export function GameEngine({
                 </div>
             )}
 
-            {/* [v3.55] Touch-kontroller optimerade för både Porträtt och Landskap via Portal - Robust Crash Fix */}
+            {/* [v3.60] Touch-kontroller optimerade för både Porträtt och Landskap via Portal - Robust Crash Fix */}
             {gameStarted && isMobile && typeof document !== 'undefined' && (
                 (() => {
                     const targetId = isLandscape ? 'landscape-controls-root' : 'mobile-controls-root';
@@ -1529,7 +1529,7 @@ export function GameEngine({
                                >→</button>
                             </div>
 
-                            {/* 2. Högerstyrning: [v3.55] CLUSTERED ACTION TRIAD */}
+                            {/* 2. Högerstyrning: [v3.60] CLUSTERED ACTION TRIAD */}
                             <div className={`flex flex-col items-center gap-1 pointer-events-auto ${isLandscape ? 'opacity-40 hover:opacity-100 transition-opacity mb-2' : ''}`}>
                                 {/* SPIN (🌪️) - Överst centrerad */}
                                 <button

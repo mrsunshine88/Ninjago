@@ -350,9 +350,9 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute, isNyaUnloc
       <div className="w-full mt-12 mb-8 px-4 flex flex-col md:flex-row items-center justify-between gap-6 pointer-events-none select-none border-t border-white/5 pt-8">
         {/* Version Tag */}
         <div className="text-white/50 text-[12px] font-black uppercase tracking-[0.2em] italic flex items-center gap-2">
-          <span className="text-primary group-hover:text-white transition-colors">v3.55</span>
+          <span className="text-primary group-hover:text-white transition-colors">v3.60</span>
           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-          <span className="bg-red-500/10 text-red-500/60 px-2 py-0.5 rounded text-[10px]">STABLE ORIENTATION</span>
+          <span className="bg-red-500/10 text-red-500/60 px-2 py-0.5 rounded text-[10px]">FINAL POLISH</span>
         </div>
         
         {/* Credit Text */}
