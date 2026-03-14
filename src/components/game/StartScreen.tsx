@@ -350,9 +350,9 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute, isNyaUnloc
       <div className="w-full mt-12 md:mt-0 mb-8 md:mb-0 px-4 md:px-10 flex flex-col md:flex-row items-center justify-between gap-6 pointer-events-none select-none border-t md:border-t-0 border-white/5 pt-8 md:pt-0 md:absolute md:bottom-6 md:left-0 z-50">
         {/* Version Tag */}
         <div className="text-white/50 text-[10px] md:text-[12px] font-black uppercase tracking-[0.2em] italic flex items-center gap-2">
-          <span className="text-primary group-hover:text-white transition-colors">v4.00</span>
+          <span className="text-primary group-hover:text-white transition-colors">v3.71</span>
           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-          <span className="bg-red-500/10 text-red-500/60 px-2 py-0.5 rounded text-[10px]">LAYOUT FIXED</span>
+          <span className="bg-red-500/10 text-red-500/60 px-2 py-0.5 rounded text-[10px]">FIX COMPLETE</span>
         </div>
         
         {/* Credit Text */}

@@ -303,7 +303,7 @@ export function GameEngine({
 
             // [v3.47] Use standardized image key from game-data
             const bossImg = level.boss.imageKey || 'overlord.png';
-            // [v4.00] Boss HP: Reverted to original levels but with Active Defense
+            // [v3.71] Boss HP: Reverted to original levels but with Active Defense
             let bossHP = 1000; // Level 1
             if (level.number === 2) bossHP = 2000;
             else if (level.number === 3) bossHP = 3000;
@@ -830,9 +830,11 @@ export function GameEngine({
                             const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
                             const data = imageData.data;
                             for (let j = 0; j < data.length; j += 4) { 
-                                // [v3.80] Final Transparency Fix for Level 6 artifacts
+                                // [v3.71] ULTRA-Aggressive Transparency for Level 6 artifacts "net"
                                 const r = data[j], g = data[j + 1], bDigit = data[j + 2];
-                                const threshold = (level.number === 6) ? 140 : 190;
+                                // Catch near-white, light gray, and very bright colors
+                                // Level 6 threshold 70 is extremely aggressive to catch all light artifacts
+                                const threshold = (level.number === 6) ? 70 : 190;
                                 if ((r > threshold && g > threshold && bDigit > threshold) || (r > 240 || g > 240 || bDigit > 240)) data[j + 3] = 0; 
                             }
                             tempCtx.putImageData(imageData, 0, 0); cleanedImages.current[e.img] = canvas;
@@ -1009,7 +1011,7 @@ export function GameEngine({
                     else if (ninja.id === 'nya_smith') dmg = 20;
 
                     b.hp -= dmg; b.hitT = 10; s.projs.splice(i, 1); s.shake = 5;
-                    // [v4.00] Active Defense: Boss counter-attacks immediately when hit
+                    // [v3.71] Active Defense: Boss counter-attacks immediately when hit
                     if (!b.active) { b.active = true; s.enemies = []; }
                     b.attackCd = Math.min(b.attackCd, 8); 
                     if (pr.type === 'water') {
@@ -1047,8 +1049,8 @@ export function GameEngine({
                 }
             }
 
-            // [v3.10] Boss Position Fix (spawn lock)
-            if (s.x > level.length - 600) {
+            // [v3.71] Boss Position Fix (spawn lock) - Increased distance to 1100px to ensure early activation
+            if (s.x > level.length - 1100) {
                 const b = s.boss;
                 if (!b.active) {
                     b.active = true;
@@ -1062,7 +1064,7 @@ export function GameEngine({
                 if (s.freezeTime <= 0) {
                     b.phase += 0.045 * dt;
 
-                    // [v4.00] Up-and-Down Movement: Boss stays at the end and oscillates vertically
+                    // [v3.71] Up-and-Down Movement: Boss stays at the end and oscillates vertically
                     const arenaEnd = level.length - 400;
                     b.x = arenaEnd + Math.sin(b.phase * 0.2) * 20; // Minimal horizontal sway
 
@@ -1384,10 +1386,16 @@ export function GameEngine({
                             ctx.translate(-(b.x + b.w / 2), -(b.y + b.h / 2));
                         }
 
-                        // [v3.80] Universal Flip Revision: ALL bosses face left
-                        ctx.translate(b.x + b.w, b.y);
-                        ctx.scale(-1, 1);
-                        ctx.drawImage(cleanedBImg, 0, 0, b.w, b.h);
+                        // [v3.71] Selective Boss Flip: ONLY [2, 3, 6, 7] need flipping to face left.
+                        // Levels [1, 4, 5] already face left in their source images.
+                        const needsFlip = [2, 3, 6, 7].includes(level.number);
+                        if (needsFlip) {
+                            ctx.translate(b.x + b.w, b.y);
+                            ctx.scale(-1, 1);
+                            ctx.drawImage(cleanedBImg, 0, 0, b.w, b.h);
+                        } else {
+                            ctx.drawImage(cleanedBImg, b.x, b.y, b.w, b.h);
+                        }
                     } finally {
                         ctx.restore();
                     }
