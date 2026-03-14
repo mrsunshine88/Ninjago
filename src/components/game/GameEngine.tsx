@@ -303,8 +303,8 @@ export function GameEngine({
 
             // [v3.47] Use standardized image key from game-data
             const bossImg = level.boss.imageKey || 'overlord.png';
-            // Bossens HP: [v2.80] Massive Increase
-            let bossHP = 1000;
+            // [v4.00] Boss HP: Reverted to original levels but with Active Defense
+            let bossHP = 1000; // Level 1
             if (level.number === 2) bossHP = 2000;
             else if (level.number === 3) bossHP = 3000;
             else if (level.number === 4) bossHP = 4000;
@@ -830,11 +830,9 @@ export function GameEngine({
                             const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
                             const data = imageData.data;
                             for (let j = 0; j < data.length; j += 4) { 
-                                // [v3.70] Aggressive transparency cleanup for Level 6 and others ("net" issue)
+                                // [v3.80] Final Transparency Fix for Level 6 artifacts
                                 const r = data[j], g = data[j + 1], bDigit = data[j + 2];
-                                // Catch near-white, light gray, and very bright colors
-                                // Level 6 often has artifacts in the 170-200 range
-                                const threshold = (level.number === 6) ? 160 : 190;
+                                const threshold = (level.number === 6) ? 140 : 190;
                                 if ((r > threshold && g > threshold && bDigit > threshold) || (r > 240 || g > 240 || bDigit > 240)) data[j + 3] = 0; 
                             }
                             tempCtx.putImageData(imageData, 0, 0); cleanedImages.current[e.img] = canvas;
@@ -1011,6 +1009,9 @@ export function GameEngine({
                     else if (ninja.id === 'nya_smith') dmg = 20;
 
                     b.hp -= dmg; b.hitT = 10; s.projs.splice(i, 1); s.shake = 5;
+                    // [v4.00] Active Defense: Boss counter-attacks immediately when hit
+                    if (!b.active) { b.active = true; s.enemies = []; }
+                    b.attackCd = Math.min(b.attackCd, 8); 
                     if (pr.type === 'water') {
                         // [v2.42] Debuffs: Slow + Drenched
                         b.slowT = 90;
@@ -1051,7 +1052,7 @@ export function GameEngine({
                 const b = s.boss;
                 if (!b.active) {
                     b.active = true;
-                    b.attackCd = 20; // [v3.70] First shot even faster
+                    b.attackCd = 10; // [v3.80] First shot even faster
                     // [v3.10] Rensa vägen: Ta bort alla småfiender när duellen börjar
                     s.enemies = [];
                 }
@@ -1059,27 +1060,31 @@ export function GameEngine({
 
                 // [v3.10] Zane Freeze also affects boss
                 if (s.freezeTime <= 0) {
-                    b.phase += 0.035 * dt;
+                    b.phase += 0.045 * dt;
 
-                    // [v3.01] Ultimate Boss Positioning: Hard Clamped for 100% Visibility
-                    const targetX = Math.max(s.x + 350, level.length - 700);
-                    const margin = 20;
-                    const screenRight = s.cameraX + 800 - b.w - margin;
-                    const screenLeft = Math.max(s.cameraX + margin, s.x + 100);
+                    // [v4.00] Up-and-Down Movement: Boss stays at the end and oscillates vertically
+                    const arenaEnd = level.length - 400;
+                    b.x = arenaEnd + Math.sin(b.phase * 0.2) * 20; // Minimal horizontal sway
 
-                    let rawX = targetX + Math.sin(b.phase * 0.5) * 50;
-                    b.x = Math.min(screenRight, Math.max(screenLeft, rawX));
-
-                    // [v3.00] Aiming: Boss tracks ninja's Y position
-                    const desiredY = Math.min(300, Math.max(50, s.y + 80 - b.h / 2));
-                    b.y += (desiredY - b.y) * 0.05 * dt;
+                    // Strong vertical movement pattern
+                    const baseHeight = 250;
+                    const amplitude = 180 + (level.number * 5); // Increased range with level
+                    b.y = baseHeight + Math.sin(b.phase) * amplitude;
+                    
+                    // Keep boss within bounds [50, 450]
+                    b.y = Math.max(50, Math.min(450, b.y));
                 }
             }
 
-            // [v3.70] Persistent Shooting Logic: Boss keeps shooting as long as it's active
+            // [v3.80] Combat Logic: Persistent Shooting
             if (s.boss.active && s.boss.hp > 0) {
                 const b = s.boss;
-                b.attackCd -= dt;
+                // [v3.80] Drenched logic fixed (decreases speed properly without recursive multiplication)
+                const attackStep = dt * (b.drenchedT > 0 ? 0.5 : 1);
+                b.attackCd -= attackStep;
+                
+                if (b.drenchedT > 0) b.drenchedT -= dt;
+
                 if (b.attackCd <= 0 && s.freezeTime <= 0) {
                     const bX = b.x + b.w / 2, bY = b.y + b.h / 2;
                     const angle = Math.atan2((s.y + 140) - bY, (s.x + 70) - bX);
@@ -1088,7 +1093,6 @@ export function GameEngine({
                     const isHoming = lvlNum >= 4 && Math.random() < 0.3;
 
                     if (lvlNum === 7) {
-                        // [v3.70] Lord Garmadon: 2-shot fan
                         for (let j = 0; j < 2; j++) {
                             const spreadAngle = angle + (j === 0 ? -0.15 : 0.15);
                             s.bossProjs.push({
@@ -1101,7 +1105,6 @@ export function GameEngine({
                         }
                         b.attackCd = 12;
                     } else {
-                        // [v3.70] Level 1-6 shooting frequency
                         const speed = (6 + lvlNum * 0.35) * 1.3;
                         let color = '#ff4400';
                         let type: any = 'fire';
@@ -1118,29 +1121,21 @@ export function GameEngine({
                             c: color, r: 25 + lvlNum * 5, type, isHoming
                         });
 
-                        // [v3.70] Clear intervals: Lv1: 0.6s, Lv6: 0.25s
-                        // Calculation: 45 - (lvlNum * 5) -> 40, 35, 30, 25, 20, 15
-                        b.attackCd = Math.max(15, 45 - (lvlNum * 5));
+                        // [v3.80] Faster intervals for better challenge
+                        // Calculation: 36 - (lvlNum * 4) -> 32, 28, 24, 20, 16, 12
+                        b.attackCd = Math.max(12, 36 - (lvlNum * 4));
 
-                        // [v3.70] Particles for Lv 1-6
                         for (let k = 0; k < 10; k++) s.particles.push({ 
                             x: bX, y: bY, dx: (Math.random() - 0.5) * 10, dy: (Math.random() - 0.5) * 10, 
                             life: 20, size: 4, color: color, type: 'spark' 
                         });
                     }
                     
-                    // [v3.70] Garmadon Particles (handled separately to avoid scope errors)
                     if (lvlNum === 7) {
                         for (let k = 0; k < 10; k++) s.particles.push({ 
                             x: bX, y: bY, dx: (Math.random() - 0.5) * 10, dy: (Math.random() - 0.5) * 10, 
                             life: 20, size: 4, color: '#8800ff', type: 'spark' 
                         });
-                    }
-
-                    // [v2.42] Drenched Effect: Shoot 50% slower (Double Cd)
-                    if (b.drenchedT > 0) {
-                        b.attackCd *= 2;
-                        b.drenchedT--;
                     }
                 }
             }
@@ -1389,15 +1384,10 @@ export function GameEngine({
                             ctx.translate(-(b.x + b.w / 2), -(b.y + b.h / 2));
                         }
 
-                        // [v3.70] Selective Boss Flip: 1, 4, 5 No Flip; 2, 3, 6, 7 Flip
-                        const needsFlip = [2, 3, 6, 7].includes(level.number);
-                        if (needsFlip) {
-                            ctx.translate(b.x + b.w, b.y);
-                            ctx.scale(-1, 1);
-                            ctx.drawImage(cleanedBImg, 0, 0, b.w, b.h);
-                        } else {
-                            ctx.drawImage(cleanedBImg, b.x, b.y, b.w, b.h);
-                        }
+                        // [v3.80] Universal Flip Revision: ALL bosses face left
+                        ctx.translate(b.x + b.w, b.y);
+                        ctx.scale(-1, 1);
+                        ctx.drawImage(cleanedBImg, 0, 0, b.w, b.h);
                     } finally {
                         ctx.restore();
                     }

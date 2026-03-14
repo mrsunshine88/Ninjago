@@ -127,7 +127,7 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute, isNyaUnloc
   };
 
   return (
-    <div className="relative h-[100dvh] w-full flex flex-col items-center justify-start md:justify-center pt-8 pb-24 px-4 md:p-6 gap-6 md:gap-8 overflow-y-auto overflow-x-hidden cursor-default" suppressHydrationWarning>
+    <div className="relative h-[100dvh] w-full flex flex-col items-center justify-start md:justify-center md:pt-4 pb-24 px-4 md:p-6 gap-4 md:gap-4 overflow-y-auto overflow-x-hidden cursor-default" suppressHydrationWarning>
       {/* PWA Install Banner - [v3.23] Hydration Safe Width Check */}
       {isMounted && showInstallBanner && installPrompt && window.innerWidth < 768 && (
         <div className="fixed inset-0 z-[9999] flex items-end justify-center pointer-events-none">
@@ -201,13 +201,13 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute, isNyaUnloc
         className="text-center space-y-4 cursor-pointer select-none active:scale-95 transition-transform"
         onClick={handleLogoClick}
       >
-        <div className="inline-block p-1 bg-white/10 rounded-full mb-2 backdrop-blur-md border border-white/20 shadow-2xl overflow-hidden">
-          <img src="/icon.png" alt="Ninjago" className="w-20 h-20 md:w-32 md:h-32 object-cover rounded-full" />
+        <div className="inline-block p-1 bg-white/10 rounded-full mb-1 backdrop-blur-md border border-white/20 shadow-2xl overflow-hidden">
+          <img src="/icon.png" alt="Ninjago" className="w-16 h-16 md:w-24 md:h-24 object-cover rounded-full" />
         </div>
-        <h1 className="text-4xl md:text-8xl font-black tracking-tighter uppercase italic high-score-text drop-shadow-[0_5px_15px_rgba(0,0,0,0.8)]">
+        <h1 className="text-4xl md:text-7xl font-black tracking-tighter uppercase italic high-score-text drop-shadow-[0_5px_15px_rgba(0,0,0,0.8)]">
           Ninjago
         </h1>
-        <p className="text-lg md:text-2xl text-accent font-black tracking-[0.3em] uppercase drop-shadow-md">
+        <p className="text-md md:text-xl text-accent font-black tracking-[0.3em] uppercase drop-shadow-md">
           Elemental Clash
         </p>
       </div>
@@ -340,23 +340,23 @@ export function StartScreen({ onStart, scores, isMuted, onToggleMute, isNyaUnloc
         </div>
 
         {/* [v3.51] Leaderboard - Restored and Scrollable on all devices */}
-        <div className="w-full mt-4 max-h-[180px] md:max-h-64 overflow-y-auto custom-scrollbar rounded-xl border border-white/10 bg-black/60 p-2 shadow-inner">
+        <div className="w-full mt-2 max-h-[160px] md:max-h-56 overflow-y-auto custom-scrollbar rounded-xl border border-white/10 bg-black/60 p-2 shadow-inner">
           <Leaderboard scores={localScores} />
         </div>
       </div>
 
 
-      {/* [v3.55] Bottom info row - Moved to flow to avoid overlap on small screens */}
-      <div className="w-full mt-12 mb-8 px-4 flex flex-col md:flex-row items-center justify-between gap-6 pointer-events-none select-none border-t border-white/5 pt-8">
+      {/* [v4.00] Bottom info row - Absolute strictly on desktop to save vertical space */}
+      <div className="w-full mt-12 md:mt-0 mb-8 md:mb-0 px-4 md:px-10 flex flex-col md:flex-row items-center justify-between gap-6 pointer-events-none select-none border-t md:border-t-0 border-white/5 pt-8 md:pt-0 md:absolute md:bottom-6 md:left-0 z-50">
         {/* Version Tag */}
-        <div className="text-white/50 text-[12px] font-black uppercase tracking-[0.2em] italic flex items-center gap-2">
-          <span className="text-primary group-hover:text-white transition-colors">v3.70</span>
+        <div className="text-white/50 text-[10px] md:text-[12px] font-black uppercase tracking-[0.2em] italic flex items-center gap-2">
+          <span className="text-primary group-hover:text-white transition-colors">v4.00</span>
           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-          <span className="bg-red-500/10 text-red-500/60 px-2 py-0.5 rounded text-[10px]">ULTIMATE BOSSES</span>
+          <span className="bg-red-500/10 text-red-500/60 px-2 py-0.5 rounded text-[10px]">LAYOUT FIXED</span>
         </div>
         
         {/* Credit Text */}
-        <div className="text-[#FFD700] text-[11px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] whitespace-nowrap opacity-60">
+        <div className="text-[#FFD700] text-[10px] md:text-[11px] font-black uppercase tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] whitespace-nowrap opacity-60">
           Game Idea & Design by Lukas Persson
         </div>
       </div>
