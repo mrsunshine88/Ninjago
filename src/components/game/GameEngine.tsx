@@ -830,8 +830,9 @@ export function GameEngine({
                             const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
                             const data = imageData.data;
                             for (let j = 0; j < data.length; j += 4) { 
-                                // [v3.42] Catch near-white pixels to remove outlines
-                                if (data[j] > 220 && data[j + 1] > 220 && data[j + 2] > 220) data[j + 3] = 0; 
+                                // [v3.56] Catch near-white and grayish pixels to remove outlines ("net" issue)
+                                const r = data[j], g = data[j + 1], bDigit = data[j + 2];
+                                if ((r > 210 && g > 210 && bDigit > 210) || (r > 240 || g > 240 || bDigit > 240)) data[j + 3] = 0; 
                             }
                             tempCtx.putImageData(imageData, 0, 0); cleanedImages.current[e.img] = canvas;
                         }
@@ -855,7 +856,11 @@ export function GameEngine({
                         ctx.restore();
                     }
                 } else if (!isOnScreen) {
-                   // No draw
+                   // No draw - [v3.56] Ensure strict removal if far behind camera
+                   if (e.x < s.cameraX - 500) {
+                       s.enemies.splice(i, 1);
+                       continue;
+                   }
                 } else { ctx.fillStyle = "#8b5cf6"; ctx.fillRect(e.x, e.y, e.w, e.h); }
 
                 // Kollisionshantering spelare <-> fiende
@@ -1043,6 +1048,7 @@ export function GameEngine({
                 const b = s.boss;
                 if (!b.active) {
                     b.active = true;
+                    b.attackCd = 30; // [v3.56] Start shooting almost immediately
                     // [v3.10] Rensa vägen: Ta bort alla småfiender när duellen börjar
                     s.enemies = [];
                 }
@@ -1090,19 +1096,19 @@ export function GameEngine({
                     const isHoming = lvlNum >= 4 && Math.random() < 0.3;
 
                     if (lvlNum === 7) {
-                        // [v2.93] Garmadon UNIQUE 3-shot fan
-                        for (let j = 0; j < 3; j++) {
-                            const spreadAngle = angle + (j - 1) * 0.2;
+                        // [v3.56] Lord Garmadon: 2-shot fan
+                        for (let j = 0; j < 2; j++) {
+                            const spreadAngle = angle + (j === 0 ? -0.15 : 0.15);
                             s.bossProjs.push({
                                 x: bX, y: bY,
-                                dx: Math.cos(spreadAngle) * 8 * 1.3,
-                                dy: Math.sin(spreadAngle) * 8 * 1.3,
+                                dx: Math.cos(spreadAngle) * 9 * 1.3,
+                                dy: Math.sin(spreadAngle) * 9 * 1.3,
                                 c: '#8800ff', r: 35, type: 'zigzag',
                                 isHoming, phase: 0, baseY: bY
                             });
                         }
                     } else {
-                        // [v2.93] Level 1-6 ALWAYS 1 shot, but speed/freq scales
+                        // [v3.56] Level 1-6 ALWAYS 1 shot, frequency scales to meet requirement
                         s.bossProjs.push({
                             x: bX, y: bY,
                             dx: Math.cos(angle) * speed,
@@ -1111,8 +1117,8 @@ export function GameEngine({
                         });
                     }
 
-                    // [v3.42] Linear Difficulty scaling: Lv1 is slow, Lv6 is fast
-                    s.boss.attackCd = Math.max(15, 120 - (lvlNum * 16));
+                    // [v3.56] Optimized Difficulty scaling: Lv1 approx 0.75s between shots, Lv6 very fast
+                    s.boss.attackCd = lvlNum === 7 ? 12 : Math.max(15, 60 - (lvlNum * 8));
                     // [v2.42] Drenched Effect: Shoot 50% slower (Double Cd)
                     if (b.drenchedT > 0) {
                         s.boss.attackCd *= 2;
@@ -1366,14 +1372,10 @@ export function GameEngine({
                             ctx.translate(-(b.x + b.w / 2), -(b.y + b.h / 2));
                         }
 
-                        // [v3.11/v3.19] Universal Boss Flip (Levels 2-7) 
-                        if (level.number >= 2) {
-                            ctx.translate(b.x + b.w, b.y);
-                            ctx.scale(-1, 1);
-                            ctx.drawImage(cleanedBImg, 0, 0, b.w, b.h);
-                        } else {
-                            ctx.drawImage(cleanedBImg, b.x, b.y, b.w, b.h);
-                        }
+                        // [v3.56] Universal Boss Flip: ALL bosses face left
+                        ctx.translate(b.x + b.w, b.y);
+                        ctx.scale(-1, 1);
+                        ctx.drawImage(cleanedBImg, 0, 0, b.w, b.h);
                     } finally {
                         ctx.restore();
                     }

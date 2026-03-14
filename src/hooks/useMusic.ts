@@ -39,14 +39,28 @@ export function useMusic(isMuted: boolean) {
     }
   }, [isMuted]);
 
-  // Cleanup
+  // Visibility Handling
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (musicRef.current && musicRef.current.playing()) {
+          musicRef.current.pause();
+        }
+      } else {
+        if (musicRef.current && !isMuted) {
+          musicRef.current.play();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (musicRef.current) {
         musicRef.current.stop();
       }
     };
-  }, []);
+  }, [isMuted]);
 
   return { playMusic };
 }
