@@ -834,7 +834,7 @@ export function GameEngine({
                                     const r = data[j], g = data[j + 1], bDigit = data[j + 2];
                                     // Catch near-white, light gray, and very bright colors
                                     // Level 6 threshold 70 is extremely aggressive to catch all light artifacts
-                                    const threshold = 190;
+                                    const threshold = e.img.includes('overlord_v3.png') ? 300 : 190;
                                     if ((r > threshold && g > threshold && bDigit > threshold) || (r > 240 || g > 240 || bDigit > 240)) data[j + 3] = 0;
                                 }
                                 tempCtx.putImageData(imageData, 0, 0); cleanedImages.current[e.img] = canvas;
