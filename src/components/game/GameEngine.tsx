@@ -121,7 +121,7 @@ export function GameEngine({
             images.current[key] = img;
         });
 
-        const bossFiles = ['overlord.png', 'stor drake.png', 'lila svart stor orm.png', 'storm arg orm.png', 'grön demon.png', 'lila svart monster.png', 'Lord Garmadon.png'];
+        const bossFiles = ['overlord_v2.png', 'stor drake.png', 'lila svart stor orm.png', 'storm arg orm.png', 'grön demon.png', 'lila svart monster.png', 'Lord Garmadon.png'];
         [...monsterFiles, ...bossFiles].forEach(f => {
             const img = new Image();
             img.src = `/${encodeURIComponent(f)}`;
@@ -834,7 +834,7 @@ export function GameEngine({
                                     const r = data[j], g = data[j + 1], bDigit = data[j + 2];
                                     // Catch near-white, light gray, and very bright colors
                                     // Level 6 threshold 70 is extremely aggressive to catch all light artifacts
-                                    const threshold = (level.number === 6) ? 190 : 190;
+                                    const threshold = 190;
                                     if ((r > threshold && g > threshold && bDigit > threshold) || (r > 240 || g > 240 || bDigit > 240)) data[j + 3] = 0;
                                 }
                                 tempCtx.putImageData(imageData, 0, 0); cleanedImages.current[e.img] = canvas;

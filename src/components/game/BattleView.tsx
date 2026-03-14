@@ -66,11 +66,11 @@ export function BattleView({
       {/* [v3.54] SOLID HUD - Slimmed in Landscape */}
       <div className={`relative w-full z-[500] bg-black border-b border-white/20 pt-[env(safe-area-inset-top)] shrink-0 ${isLandscape ? 'h-10' : ''}`}>
         <div className={`w-full flex justify-between items-center px-2 gap-1 ${isLandscape ? 'h-full py-0' : 'py-1.5 md:p-4'}`}>
-          
+
           {/* Vänster: Nivå */}
           <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
             <span className="text-[10px] md:text-sm text-white/40 font-black uppercase tracking-widest mt-0.5">
-              {isLandscape ? "v3.55 | STABLE LS" : "v3.55 | FIXED UI"}
+              {isLandscape ? "v4.0 | STABLE LS" : "v4.0 | FIXED UI"}
             </span>
           </div>
 
@@ -137,10 +137,10 @@ export function BattleView({
           onGameOver={(finalScore) => onGameOver?.(finalScore)}
           onScoreUpdate={(s) => setLiveScore(s)}
         />
-        
+
         {/* [v3.54] Landscape Overlay Controls target */}
         {isLandscape && (
-            <div id="landscape-controls-root" className="absolute inset-0 z-[5000] pointer-events-none" />
+          <div id="landscape-controls-root" className="absolute inset-0 z-[5000] pointer-events-none" />
         )}
       </div>
 
@@ -170,35 +170,35 @@ export function BattleView({
 
       {/* [v3.54] Bottom Panel - Hidden in Landscape to maximize game area */}
       {!isLandscape && (
-          <div className="flex w-full bg-[#0a0a0a] border-t border-white/10 p-2 md:p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] px-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] items-center gap-4 h-[40dvh] md:h-auto md:min-h-20 z-[1000] relative shrink-0">
-            {/* Status Info */}
-            <div className="hidden md:flex items-center gap-4">
-              <div className="bg-[#2a9d8f]/20 p-2 md:p-3 rounded-xl md:rounded-2xl border border-[#2a9d8f]/30 shrink-0">
-                <Heart className="w-5 h-5 md:w-7 md:h-7 text-[#2a9d8f] fill-[#2a9d8f]/30" />
-              </div>
-              <div className="flex flex-col flex-1 min-w-[120px]">
-                <span className="text-[9px] md:text-[10px] text-[#2a9d8f] font-black uppercase tracking-[0.2em]">Status</span>
-                <span className="text-[11px] md:text-sm font-bold text-white/90 italic leading-tight tracking-wide line-clamp-2">
-                  Besegra {level.boss.name || 'bossen'} för att nå nästa nivå!
-                </span>
-              </div>
+        <div className="flex w-full bg-[#0a0a0a] border-t border-white/10 p-2 md:p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] px-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] items-center gap-4 h-[40dvh] md:h-auto md:min-h-20 z-[1000] relative shrink-0">
+          {/* Status Info */}
+          <div className="hidden md:flex items-center gap-4">
+            <div className="bg-[#2a9d8f]/20 p-2 md:p-3 rounded-xl md:rounded-2xl border border-[#2a9d8f]/30 shrink-0">
+              <Heart className="w-5 h-5 md:w-7 md:h-7 text-[#2a9d8f] fill-[#2a9d8f]/30" />
             </div>
-
-            {/* [v3.54] Mobile Controls Panel target for Portrait mode */}
-            <div id="mobile-controls-root" className="flex-1 h-full" />
-
-            {/* Desktop Controls Legend */}
-            <div className="hidden lg:flex flex-col items-end border-l border-white/10 pl-6">
-              <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.2em] mb-1">Kontroller (Dator)</span>
-              <div className="flex gap-4 text-[11px] font-black text-white/90 italic tracking-wider">
-                <span>MELLANSLAG = <span className="text-blue-400">HOPPA</span></span>
-                <span className="text-white/20">|</span>
-                <span>X = <span className="text-red-500">SKJUTA</span></span>
-                <span className="text-white/20">|</span>
-                <span>Z = <span className="text-yellow-400">SPIN</span></span>
-              </div>
+            <div className="flex flex-col flex-1 min-w-[120px]">
+              <span className="text-[9px] md:text-[10px] text-[#2a9d8f] font-black uppercase tracking-[0.2em]">Status</span>
+              <span className="text-[11px] md:text-sm font-bold text-white/90 italic leading-tight tracking-wide line-clamp-2">
+                Besegra {level.boss.name || 'bossen'} för att nå nästa nivå!
+              </span>
             </div>
           </div>
+
+          {/* [v3.54] Mobile Controls Panel target for Portrait mode */}
+          <div id="mobile-controls-root" className="flex-1 h-full" />
+
+          {/* Desktop Controls Legend */}
+          <div className="hidden lg:flex flex-col items-end border-l border-white/10 pl-6">
+            <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.2em] mb-1">Kontroller (Dator)</span>
+            <div className="flex gap-4 text-[11px] font-black text-white/90 italic tracking-wider">
+              <span>MELLANSLAG = <span className="text-blue-400">HOPPA</span></span>
+              <span className="text-white/20">|</span>
+              <span>X = <span className="text-red-500">SKJUTA</span></span>
+              <span className="text-white/20">|</span>
+              <span>Z = <span className="text-yellow-400">SPIN</span></span>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
